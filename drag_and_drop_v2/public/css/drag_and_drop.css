@@ -1,3 +1,10 @@
+/* Theme token: inherits the Indigo theme's --primary CSS variable (set on :root by the
+   platform). Falls back to #000007 for non-Indigo deployments. All brand color references
+   in this file use var(--dnd-brand) so a theme change requires no edits here. */
+.xblock--drag-and-drop {
+    --dnd-brand: var(--primary, #000007);
+}
+
 /* RESPONSIVE: A2 — root container must never exceed the column it lives in.
    max-width:100% + box-sizing:border-box prevents horizontal overflow from author
    content (images, tables) forcing the whole XBlock wider than its column. */
@@ -130,7 +137,7 @@
     margin: 5px;
     padding: 10px;
     text-align: center;
-    background-color: #000007;
+    background-color: var(--dnd-brand);
     font-size: 14px;
     color: #fff;
     opacity: 1;
@@ -287,7 +294,7 @@
 .xblock--drag-and-drop .drag-container .option.grabbed-with-tap {
     outline: 3px solid #fff;
     outline-offset: -3px;
-    box-shadow: 0 0 0 3px #000007, 0 8px 16px 0 rgba(0, 0, 0, 0.25);
+    box-shadow: 0 0 0 3px var(--dnd-brand), 0 8px 16px 0 rgba(0, 0, 0, 0.25);
     opacity: .85;
     z-index: 20 !important;
     position: relative;
@@ -303,7 +310,7 @@
     line-height: 18px;
     font-size: 11px;
     text-align: center;
-    background-color: #000007;
+    background-color: var(--dnd-brand);
     color: #fff;
     border: 2px solid #fff;
     border-radius: 50%;
@@ -313,7 +320,7 @@
 /* RESPONSIVE: C3 — when a tap selection is active, highlight available drop zones.
    Uses :has() which is supported on iOS Safari 15.4+, Chrome 105+, Firefox 121+. */
 .xblock--drag-and-drop .drag-container:has(.grabbed-with-tap) .zone {
-    outline: 2px dashed rgba(0, 0, 7, 0.5);
+    outline: 2px dashed color-mix(in srgb, var(--dnd-brand) 50%, transparent);
     outline-offset: -2px;
 }
 
@@ -410,7 +417,7 @@
 /* Focused zone — 3px solid brand color meets WCAG 1.4.11 (3:1 on white); updated from 2px dotted #a5a5a5 by D5 */
 .xblock--drag-and-drop .item-bank:focus,
 .xblock--drag-and-drop .zone:focus {
-    outline: 3px solid #000007;
+    outline: 3px solid var(--dnd-brand);
     outline-offset: -3px;
 }
 
@@ -666,20 +673,20 @@
 .xblock--drag-and-drop .btn-default:focus,
 .xblock--drag-and-drop .btn-default.is-focused {
     background-color: transparent;
-    border: 1px solid #0074b4;
-    color: #0074b4
+    border: 1px solid var(--dnd-brand);
+    color: var(--dnd-brand);
 }
 
 .xblock--drag-and-drop .btn-brand:hover,
 .xblock--drag-and-drop .btn-brand.is-hovered,
 .xblock--drag-and-drop .btn-brand.is-focused {
-    background-color: #065683;
+    background-color: color-mix(in srgb, var(--dnd-brand) 80%, #fff);
 }
 
 .xblock--drag-and-drop .btn-brand.is-pressed,
 .xblock--drag-and-drop .btn-brand.is-active {
-    border-color: #0074b4;
-    background: #0074b4
+    border-color: var(--dnd-brand);
+    background: var(--dnd-brand);
 }
 
 /*** ACTIONS TOOLBAR ***/
@@ -966,7 +973,7 @@
 .xblock--drag-and-drop button:focus,
 .xblock--drag-and-drop .btn-brand:focus,
 .xblock--drag-and-drop .btn-default:focus {
-    outline: 3px solid #000007;
+    outline: 3px solid var(--dnd-brand);
     outline-offset: 2px;
 }
 
@@ -980,7 +987,7 @@
 }
 
 /* D5 — Zone/item-bank focus visibility updated in-place above (line ~409).
-   The original 2px dotted #a5a5a5 rule was replaced with 3px solid #000007 for WCAG 1.4.11 compliance. */
+   The original 2px dotted #a5a5a5 rule was replaced with 3px solid var(--dnd-brand) for WCAG 1.4.11 compliance. */
 
 /* D6 — Disabled state: opacity and cursor make it visually clear when attempts are exhausted
    or interaction is disabled, without relying on color alone.
