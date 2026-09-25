@@ -1,14 +1,13 @@
 /* Theme token: inherits the Indigo theme's --primary CSS variable (set on :root by the
    platform). Falls back to #000007 for non-Indigo deployments. All brand color references
-   in this file use var(--dnd-brand) so a theme change requires no edits here. */
-.xblock--drag-and-drop {
-    --dnd-brand: var(--primary, #000007);
-}
-
-/* RESPONSIVE: A2 — root container must never exceed the column it lives in.
+   in this file use var(--dnd-brand) so a theme change requires no edits here.
+   CONSTRAINT: --primary must have ≥ 4.5:1 contrast against #fff (WCAG 1.4.3) because
+   draggable items use white text on a var(--dnd-brand) background.
+   RESPONSIVE: A2 — root container must never exceed the column it lives in.
    max-width:100% + box-sizing:border-box prevents horizontal overflow from author
    content (images, tables) forcing the whole XBlock wider than its column. */
 .xblock--drag-and-drop {
+    --dnd-brand: var(--primary, #000007);
     width: auto;
     max-width: 100%;
     box-sizing: border-box;
@@ -141,7 +140,6 @@
     font-size: 14px;
     color: #fff;
     opacity: 1;
-    outline-color: #fff;
     outline-style: none;
     /* Some versions of the drag and drop library try to fiddle with this */
     z-index: 10 !important;
@@ -272,9 +270,10 @@
 .xblock--drag-and-drop .drag-container .option[draggable='true'][aria-grabbed='true'] {
     outline-width: 2px;
     outline-style: dotted;
+    outline-color: #fff;
     outline-offset: -4px;
     /* IE 11 doesn't support outline-offset, so we use a box-shadow instead. */
-    box-shadow: inset 0 0 0 2px;
+    box-shadow: inset 0 0 0 2px #fff;
 }
 
 .xblock--drag-and-drop .drag-container .option.grabbed-with-mouse {
@@ -318,9 +317,20 @@
 }
 
 /* RESPONSIVE: C3 — when a tap selection is active, highlight available drop zones.
-   Uses :has() which is supported on iOS Safari 15.4+, Chrome 105+, Firefox 121+. */
+   Two parallel rules achieve progressive enhancement:
+   1. Class-based fallback (.has-tap-selection added by JS) works in all browsers.
+   2. :has()-based rule upgrades to a semi-transparent outline where both :has() and
+      color-mix() are supported (Chrome 111+, Firefox 121+, Safari 16.2+).
+   The grabbed-with-tap class and has-tap-selection are set by JS grabItem('tap').
+   TODO: JS tap-to-place detection (touchend without touchmove) is not yet implemented;
+   these rules are infrastructure for that feature. */
+.xblock--drag-and-drop .drag-container.has-tap-selection .zone {
+    outline: 2px dashed var(--dnd-brand);
+    outline-offset: -2px;
+}
 .xblock--drag-and-drop .drag-container:has(.grabbed-with-tap) .zone {
-    outline: 2px dashed color-mix(in srgb, var(--dnd-brand) 50%, transparent);
+    outline: 2px dashed var(--dnd-brand);                                           /* fallback: no color-mix */
+    outline: 2px dashed color-mix(in srgb, var(--dnd-brand) 70%, transparent);     /* progressive enhancement */
     outline-offset: -2px;
 }
 
@@ -680,7 +690,8 @@
 .xblock--drag-and-drop .btn-brand:hover,
 .xblock--drag-and-drop .btn-brand.is-hovered,
 .xblock--drag-and-drop .btn-brand.is-focused {
-    background-color: color-mix(in srgb, var(--dnd-brand) 80%, #fff);
+    background-color: var(--dnd-brand);                                         /* fallback: no color-mix */
+    background-color: color-mix(in srgb, var(--dnd-brand) 80%, #000);          /* darken on hover */
 }
 
 .xblock--drag-and-drop .btn-brand.is-pressed,

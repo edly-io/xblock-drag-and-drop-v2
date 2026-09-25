@@ -1777,6 +1777,9 @@ function DragAndDropBlock(runtime, element, configuration) {
                 delete item.grabbed_with;
             }
         });
+        // Mirror tap-selection state on the container so the :has() fallback CSS rule
+        // (.drag-container.has-tap-selection .zone) works in browsers without :has() support.
+        $root.find('.drag-container').toggleClass('has-tap-selection', interaction_type === 'tap');
         closePopup(false);
         applyState();
     };
@@ -1786,6 +1789,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             item.grabbed = false;
             delete item.grabbed_with;
         });
+        $root.find('.drag-container').removeClass('has-tap-selection');
         applyState();
     };
 
