@@ -1,5 +1,10 @@
+/* RESPONSIVE: A2 — root container must never exceed the column it lives in.
+   max-width:100% + box-sizing:border-box prevents horizontal overflow from author
+   content (images, tables) forcing the whole XBlock wider than its column. */
 .xblock--drag-and-drop {
     width: auto;
+    max-width: 100%;
+    box-sizing: border-box;
     margin: 0;
     padding: 0;
     position: relative;
@@ -58,8 +63,18 @@
     margin-bottom: 0.5em;
 }
 
+/* RESPONSIVE: A2 — problem text and embedded images must not force horizontal overflow. */
+.xblock--drag-and-drop .problem {
+    overflow-wrap: anywhere;
+}
+
 .xblock--drag-and-drop .problem p {
     margin-bottom: 1.41575em;
+}
+
+.xblock--drag-and-drop .problem > p img {
+    max-width: 100%;
+    height: auto;
 }
 
 /* Shared styles used in header and footer */
@@ -124,24 +139,32 @@
     /* Some versions of the drag and drop library try to fiddle with this */
     z-index: 10 !important;
     -webkit-touch-callout: none;
+    /* RESPONSIVE: C5 — prevent iOS long-press text selection and suppress the 300ms
+       double-tap zoom delay. user-select does not affect keyboard accessibility.
+       touch-action:manipulation is safe on bank items because they also scroll the page
+       vertically; only touch-action:none would kill scrolling. */
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
 }
 
+/* RESPONSIVE: A1 — item bank stacks vertically on narrow screens instead of horizontal-scrolling.
+   The horizontal scroller forced users to swipe-to-discover items while competing with the
+   250ms touch-drag gesture. Wrapping keeps every item visible and removes that conflict. */
 @media screen and (max-width: 480px) {
-   /* Horizontal scroll for item bank on mobile */
     .xblock--drag-and-drop .item-bank {
-        -ms-flex-flow: row nowrap;
-        flex-flow: row nowrap;
-        overflow-x: auto;
+        -ms-flex-flow: row wrap;
+        flex-flow: row wrap;
     }
 
     .xblock--drag-and-drop .drag-container .option {
-        max-width: 80%;
+        max-width: calc(100% - 10px);
     }
 
     .xblock--drag-and-drop .drag-container .item-bank .option {
         flex-shrink: 0;
-        flex-grow: 0;
-        max-width: 80%;
+        max-width: calc(100% - 10px);
     }
 }
 
@@ -175,6 +198,9 @@
                  /* (this can happen if item displays image whose width exceeds computed max-width of item) */
     overflow-wrap: break-word;
     word-wrap: break-word;
+    /* RESPONSIVE: D4 — explicit normal whitespace prevents any ancestor white-space:nowrap
+       from clipping long item labels. overflow:visible is the default; no hidden clipping here. */
+    white-space: normal;
 }
 
 .xblock--drag-and-drop .drag-container .option .spinner-wrapper {
@@ -255,6 +281,42 @@
     margin: 0 auto; /* Revert to auto margin when dragging with mouse to not confuse jQuery UI draggable */
 }
 
+/* RESPONSIVE: C3 — tap-to-place selected state.
+   Uses a contrasting outline so the selection is visible without relying on color alone.
+   The ::after glyph provides a non-color indicator (check-mark badge) required by WCAG 1.4.1. */
+.xblock--drag-and-drop .drag-container .option.grabbed-with-tap {
+    outline: 3px solid #fff;
+    outline-offset: -3px;
+    box-shadow: 0 0 0 3px #1d5280, 0 8px 16px 0 rgba(0, 0, 0, 0.25);
+    opacity: .85;
+    z-index: 20 !important;
+    position: relative;
+}
+
+.xblock--drag-and-drop .drag-container .option.grabbed-with-tap::after {
+    content: '\2713'; /* check mark */
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 18px;
+    height: 18px;
+    line-height: 18px;
+    font-size: 11px;
+    text-align: center;
+    background-color: #1d5280;
+    color: #fff;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    pointer-events: none;
+}
+
+/* RESPONSIVE: C3 — when a tap selection is active, highlight available drop zones.
+   Uses :has() which is supported on iOS Safari 15.4+, Chrome 105+, Firefox 121+. */
+.xblock--drag-and-drop .drag-container:has(.grabbed-with-tap) .zone {
+    outline: 2px dashed rgba(29, 82, 128, 0.5);
+    outline-offset: -2px;
+}
+
 .xblock--drag-and-drop .drag-container .option img {
     display: inline-block;
     max-width: 100%;
@@ -262,7 +324,9 @@
 }
 
 .xblock--drag-and-drop .drag-container .option.fade {
-    opacity: 0.80;
+    /* 0.55 — clearly non-interactive while keeping item content readable; cursor: default added by D6 */
+    opacity: 0.55;
+    cursor: default;
 }
 
 /*** DROP TARGET ***/
@@ -291,23 +355,16 @@
     height: auto;
 }
 
-@media screen and (max-width: 480px) {
-    .xblock--drag-and-drop .target {
-        overflow: auto;
-        display: block;
-    }
-
-    .xblock--drag-and-drop .target-img {
-        max-width: none;
-        width: auto;
-    }
-
-    .xblock--drag-and-drop .target-img-wrapper {
-        display: inline-block;
-        position: relative;
-        width: max-content;
-    }
-}
+/* RESPONSIVE: B1 — The no-scale mobile path (overflow:auto + max-width:none) was the root
+   cause of failures 1, 2, 4, 5 and 8: image renders at natural size inside a 320px box,
+   drag bounds are clamped to the narrower container, and off-screen zones are unreachable.
+   Removing this block lets narrow viewports use the same display:table / max-width:100%
+   fluid-scaling path as desktop. The image aspect ratio is preserved at every width by
+   the existing height:auto on .target-img (line above). Zones stay correctly aligned
+   because they are percentage-positioned relative to .target-img-wrapper, which
+   shrink-wraps the rendered (scaled) image. elementFromPoint hit-detection also stays
+   correct because zones are real layout boxes, not coordinate-transformed overlays.
+   Desktop is unaffected: it never matched this query. */
 
 .xblock--drag-and-drop .zone {
     position: absolute;
@@ -350,10 +407,11 @@
     border: 4px solid #000000;
 }
 
-/* Focused zone */
+/* Focused zone — 3px solid brand blue meets WCAG 1.4.11 (3:1 on white); updated from 2px dotted #a5a5a5 by D5 */
 .xblock--drag-and-drop .item-bank:focus,
 .xblock--drag-and-drop .zone:focus {
-    outline: 2px dotted #a5a5a5;
+    outline: 3px solid #1d5280;
+    outline-offset: -3px;
 }
 
 .xblock--drag-and-drop .drag-container .target .zone p {
@@ -578,6 +636,13 @@
     border-radius: 3px;
     padding: 0.625em 1.25em;
     font-size: 1em;
+    /* RESPONSIVE: C5 — suppress the 300ms double-tap delay on touch devices. */
+    touch-action: manipulation;
+}
+
+/* RESPONSIVE: C5 — also cover buttons not using .btn-brand/.btn-default. */
+.xblock--drag-and-drop button {
+    touch-action: manipulation;
 }
 
 .xblock--drag-and-drop .btn-default {
@@ -657,20 +722,30 @@
     text-align: right;
 }
 
+/* RESPONSIVE: A3 — below 768px, wrap action buttons into a flex row so Submit/Reset/Show Answer
+   are reachable and readable on 320px screens without clipping or awkward stacking. */
+@media (max-width: 767px) {
+    .xblock--drag-and-drop .action .problem-action-buttons-wrapper {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+}
+
 @media (min-width: 768px) {
     .xblock--drag-and-drop .action .problem-action-buttons-wrapper {
         margin: 0;
     }
 
+    /* Note: padding-right/-left with negative values are invalid and were ignored by browsers.
+       They have been removed. padding-top is retained as it is valid and provides spacing. */
     .ltr .xblock--drag-and-drop .action .problem-action-buttons-wrapper {
         float: right;
-        padding-right: -5px;
         padding-top: 5px;
     }
 
     .rtl .xblock--drag-and-drop .action .problem-action-buttons-wrapper {
         float: left;
-        padding-left: -5px;
     }
 }
 
@@ -822,3 +897,103 @@
         box-shadow: none;
     }
 }
+
+/*** RESPONSIVE: GROUP D — Controls, feedback, and accessibility ***/
+
+/* D1 — Touch targets: every interactive control must be at least 44×44px on mobile.
+   WCAG 2.5.5 (AAA) / 2.5.8 (AA). The action buttons and sidebar buttons use padding that
+   results in ~37-40px at 16px base — just under the target. min-height closes the gap.
+   Only bank items (.item-bank .option) get the treatment; placed items (.target .option)
+   are positioned absolutely and their rendered size must not change or zone alignment breaks. */
+@media (max-width: 767px) {
+    .xblock--drag-and-drop .btn-brand,
+    .xblock--drag-and-drop .btn-default.btn-small {
+        min-height: 44px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+
+    .xblock--drag-and-drop .item-bank .option {
+        min-height: 44px;
+    }
+
+    /* Popup close button: .unbutton removes all padding, making the tap target tiny. */
+    .xblock--drag-and-drop .popup .close-feedback-popup-desktop-button {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 10px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Keyboard help dialog dismiss button. */
+    .xblock--drag-and-drop .modal-dismiss-button {
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+/* D2 — Typography floor: no essential text below 14px on mobile.
+   .problem-progress, .submission-feedback (attempts counter), .btn-small (sidebar buttons),
+   and .btn-link (keyboard-help button) all use 0.875em which can resolve below 14px if the
+   parent font-size is smaller than 16px. Explicit px floors prevent that. */
+@media (max-width: 767px) {
+    .xblock--drag-and-drop .problem-progress {
+        font-size: 14px;
+    }
+
+    .xblock--drag-and-drop .submission-feedback {
+        font-size: 14px;
+    }
+
+    .xblock--drag-and-drop .btn-small {
+        font-size: 14px;
+    }
+
+    .xblock--drag-and-drop .btn-link {
+        font-size: 14px;
+    }
+}
+
+/* D5 — Focus outlines: every interactive control must have a visible focus indicator.
+   Provide a :focus rule first as a base (all browsers, including older ones).
+   Then override with :focus-visible to hide the outline for mouse/pointer focus in
+   modern browsers. Both rules together ensure:
+   - Old browsers: always show outline on focus (keyboard + mouse)
+   - Modern browsers: show outline only for keyboard focus
+   The 3px solid brand-color ring passes WCAG 1.4.11 (non-text contrast 3:1). */
+.xblock--drag-and-drop button:focus,
+.xblock--drag-and-drop .btn-brand:focus,
+.xblock--drag-and-drop .btn-default:focus {
+    outline: 3px solid #1d5280;
+    outline-offset: 2px;
+}
+
+/* Modern browsers: suppress the outline when focused via pointer (mouse/touch).
+   :focus-visible is ignored in browsers that don't support it, so the :focus rule above
+   stays active as the accessible fallback. */
+.xblock--drag-and-drop button:focus:not(:focus-visible),
+.xblock--drag-and-drop .btn-brand:focus:not(:focus-visible),
+.xblock--drag-and-drop .btn-default:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* D5 — Zone/item-bank focus visibility updated in-place above (line ~409).
+   The original 2px dotted #a5a5a5 rule was replaced with 3px solid #1d5280 for WCAG 1.4.11 compliance. */
+
+/* D6 — Disabled state: opacity and cursor make it visually clear when attempts are exhausted
+   or interaction is disabled, without relying on color alone.
+   pointer-events:auto is retained so the cursor:not-allowed renders even though the button
+   does not respond to clicks (the disabled attribute already blocks the click). */
+.xblock--drag-and-drop button[disabled],
+.xblock--drag-and-drop button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    pointer-events: auto;
+}
+
+/* D6 — option.fade opacity and cursor updated in-place above (line ~326).
+   Original 0.80 replaced with 0.55 + cursor:default to clearly communicate the non-interactive state. */
+
+/*** RESPONSIVE: GROUP D END ***/
