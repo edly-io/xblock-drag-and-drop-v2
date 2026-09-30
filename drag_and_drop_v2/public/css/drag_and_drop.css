@@ -1015,3 +1015,79 @@
    Original 0.80 replaced with 0.55 + cursor:default to clearly communicate the non-interactive state. */
 
 /*** RESPONSIVE: GROUP D END ***/
+
+/* An empty bank collapses. During a keyboard grab one that is still a drop target opens to one card high. */
+.xblock--drag-and-drop .item-bank:empty {
+    border: 0;
+}
+
+.xblock--drag-and-drop .drag-container.has-keyboard-selection .item-bank.item-bank-empty {
+    min-height: 68px;
+}
+
+/*** UBER MATCH CARD AND DROP ZONE MARKUP ***/
+/* The Uber theme (tutor-contrib-uber, _uber-drag-and-drop.scss) styles this markup. Without the theme
+   the grip, result icon and zone hint stay hidden, and result marks show as a coloured ring ([draggable]
+   so the ring beats the hover and focus ring). */
+.xblock--drag-and-drop .option .option-grip,
+.xblock--drag-and-drop .option .option-result-icon,
+.xblock--drag-and-drop .option .option-result-none,
+.xblock--drag-and-drop .zone .zone-hint {
+    display: none;
+}
+
+.xblock--drag-and-drop .drag-container .option[draggable].option-correct {
+    box-shadow: 0 0 0 3px #0e8345;
+}
+
+.xblock--drag-and-drop .drag-container .option[draggable].option-incorrect {
+    box-shadow: 0 0 0 3px #de1135;
+}
+
+/* Placed auto-width text items fill their zone, up to the zone width. The base `.option` rule caps an item
+   at 30% of its container, which for a placed item would be 30% of the zone. Items with an author-set width
+   or an image are sized inline by drag_and_drop.js instead. */
+.xblock--drag-and-drop .zone .item-align .option:not(.specified-width):not(.option-with-image) {
+    max-width: 100%;
+}
+
+/* The instructions panel above the items and the "1 of 3 cards placed" line under the zones. */
+.xblock--drag-and-drop .instructions {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 3px;
+    background-color: #f3f3f3;
+}
+
+.xblock--drag-and-drop .instructions p {
+    margin: 0;
+}
+
+.xblock--drag-and-drop .instructions .instructions-title {
+    font-weight: bold;
+}
+
+.xblock--drag-and-drop .placed-count {
+    margin-top: 10px;
+    color: #666;
+    font-size: 14px;
+}
+
+/* The "Correct" / "Not quite" card after an assessment attempt. */
+.xblock--drag-and-drop .attempt-result {
+    margin-top: 10px;
+    padding: 10px;
+    border-left: 4px solid #de1135;
+    border-radius: 3px;
+    background-color: #fff0ee;
+}
+
+.xblock--drag-and-drop .attempt-result.success {
+    border-left-color: #0e8345;
+    background-color: #eaf6ed;
+}
+
+.xblock--drag-and-drop .attempt-result .notification-message {
+    margin: 0 0 4px;
+    font-weight: bold;
+}

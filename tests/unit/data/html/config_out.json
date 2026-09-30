@@ -12,6 +12,8 @@
     "answer_available": false,
     "problem_text": "Solve this <strong>drag-and-drop</strong> problem.",
     "show_problem_header": false,
+    "instructions_title": "Match each card",
+    "instructions_text": "Drag each card to the zone it belongs in.",
     "target_img_expanded_url": "/expanded/url/to/drag_and_drop_v2/public/img/triangle.png",
     "target_img_description": "This describes the target image",
     "item_background_color": "white",
