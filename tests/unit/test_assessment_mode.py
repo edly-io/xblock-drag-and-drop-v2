@@ -600,7 +600,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
                 FeedbackMessages.MessageClasses.CORRECTLY_PLACED
             ),
             self._make_feedback_message(
-                FeedbackMessages.misplaced_returned(1),
+                FeedbackMessages.misplaced(1),
                 FeedbackMessages.MessageClasses.MISPLACED
             ),
             self._make_feedback_message(
@@ -659,7 +659,7 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
                 FeedbackMessages.MessageClasses.CORRECTLY_PLACED
             ),
             self._make_feedback_message(
-                FeedbackMessages.misplaced_returned(1),
+                FeedbackMessages.misplaced(1),
                 FeedbackMessages.MessageClasses.MISPLACED
             ),
             self._make_feedback_message(

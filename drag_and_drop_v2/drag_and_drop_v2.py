@@ -137,6 +137,23 @@ class DragAndDropBlock(
         default=True,
         enforce_type=True,
     )
+
+    instructions_title = String(
+        display_name=_("Instructions title"),
+        help=_("A short heading for the instructions panel above the items, e.g. \"Match each action\". "
+               "Leave both instructions fields empty to hide the panel."),
+        scope=Scope.settings,
+        default=_("Match each card"),
+        enforce_type=True,
+    )
+
+    instructions_text = String(
+        display_name=_("Instructions text"),
+        help=_("One line under the instructions title telling learners how to answer."),
+        scope=Scope.settings,
+        default=_("Drag each card to the zone it belongs in."),
+        enforce_type=True,
+    )
     showanswer = String(
         display_name=_("Show answer"),
         help=_("Defines when to show the answer to the problem. "
@@ -216,6 +233,15 @@ class DragAndDropBlock(
         help=_("Number of attempts learner used"),
         scope=Scope.user_state,
         default=0,
+        enforce_type=True,
+    )
+
+    last_attempt_result = String(
+        help=_("The result of the learner's last assessment attempt: \"correct\", \"incorrect\", or empty once "
+               "the items have changed since it or the learner pressed Try again. While it is set, the items show "
+               "their marks."),
+        scope=Scope.user_state,
+        default="",
         enforce_type=True,
     )
 
@@ -408,6 +434,8 @@ class DragAndDropBlock(
             "show_title": self.show_title,
             "problem_text": sanitize_html(self.question_text),
             "show_problem_header": self.show_question_header,
+            "instructions_title": self.instructions_title,
+            "instructions_text": self.instructions_text,
             "target_img_expanded_url": self.target_img_expanded_url,
             "target_img_description": self.target_img_description,
             "item_background_color": self.item_background_color or None,
@@ -494,6 +522,8 @@ class DragAndDropBlock(
         self.show_title = submissions['show_title']
         self.question_text = submissions['problem_text']
         self.show_question_header = submissions['show_problem_header']
+        self.instructions_title = submissions.get('instructions_title', self.instructions_title)
+        self.instructions_text = submissions.get('instructions_text', self.instructions_text)
         self.weight = float(submissions['weight'])
         self.item_background_color = submissions['item_background_color']
         self.item_text_color = submissions['item_text_color']
@@ -587,16 +617,14 @@ class DragAndDropBlock(
 
         overall_feedback_msgs, misplaced_ids = self._get_feedback(include_item_feedback=True)
 
-        misplaced_items = []
-        for item_id in misplaced_ids:
-            # Don't delete misplaced item states on the final attempt.
-            if self.attempts_remain:
-                del self.item_state[item_id]
-            misplaced_items.append(self._get_item_definition(int(item_id)))
+        # Setting the result also reveals every item's mark (see `_get_user_state`).
+        misplaced_items = [self._get_item_definition(int(item_id)) for item_id in misplaced_ids]
+        self.last_attempt_result = 'correct' if correct else 'incorrect'
 
         feedback_msgs = [FeedbackMessage(item['feedback']['incorrect'], None) for item in misplaced_items]
         return {
             'correct': correct,
+            'attempt_result': self._get_attempt_result(),
             'attempts': self.attempts,
             'grade': self._get_weighted_earned_if_set(),
             'misplaced_items': list(misplaced_ids),
@@ -624,6 +652,7 @@ class DragAndDropBlock(
         Resets problem to initial state
         """
         self.item_state = {}
+        self.last_attempt_result = ''
         return self._get_user_state()
 
     @XBlock.json_handler
@@ -648,14 +677,48 @@ class DragAndDropBlock(
 
         answer = self._get_correct_state()
 
-        if explanation := (self.data.get('explanation') or '').strip():
-            if replace_urls_service := self.runtime.service(self, 'replace_urls'):
-                explanation = replace_urls_service.replace_urls(explanation)
-            else:
-                logger.debug('Unable to perform URL substitution on the explanation: %s', explanation)
-
-            answer['explanation'] = sanitize_html(explanation)
+        if explanation := self._get_explanation():
+            answer['explanation'] = explanation
         return answer
+
+    def _get_explanation(self):
+        """
+        Returns the author's explanation as sanitized HTML, or None if there is none.
+        It gives the answer away, so callers must check `is_answer_available` first.
+        """
+        explanation = (self.data.get('explanation') or '').strip()
+        if not explanation:
+            return None
+        if replace_urls_service := self.runtime.service(self, 'replace_urls'):
+            explanation = replace_urls_service.replace_urls(explanation)
+        else:
+            logger.debug('Unable to perform URL substitution on the explanation: %s', explanation)
+        return sanitize_html(explanation)
+
+    def _get_attempt_result(self):
+        """
+        Returns the result of the last assessment attempt for the "Correct" / "Not quite" card, or None if the
+        items have changed since it. The explanation is only included once the Show Answer setting allows it.
+        """
+        if self.mode != Constants.ASSESSMENT_MODE or not self.last_attempt_result:
+            return None
+        return {
+            'correct': self.last_attempt_result == 'correct',
+            'explanation': self._get_explanation() if self.is_answer_available else None,
+        }
+
+    @XBlock.json_handler
+    def clear_attempt_result(self, data, suffix=''):
+        """
+        "Try again" in assessment mode: hides the last attempt's result and marks, so the learner can change
+        their answer. The items stay where they are, and no attempt is used.
+        """
+        if self.mode != Constants.ASSESSMENT_MODE:
+            raise JsonHandlerError(400, "clear_attempt_result handler should only be called for assessment mode")
+        if not self.attempts_remain:
+            raise JsonHandlerError(409, self.i18n_service.gettext("Max number of attempts reached"))
+        self.last_attempt_result = ''
+        return self._get_user_state()
 
     @XBlock.json_handler
     def expand_static_url(self, url, suffix=''):
@@ -876,13 +939,7 @@ class DragAndDropBlock(
                 FeedbackMessages.MessageClasses.CORRECTLY_PLACED
             )
 
-            # Misplaced items are not returned to the bank on the final attempt.
-            if self.attempts_remain:
-                misplaced_template = FeedbackMessages.misplaced_returned
-            else:
-                misplaced_template = FeedbackMessages.misplaced
-
-            _add_msg_if_exists(misplaced_ids, misplaced_template, FeedbackMessages.MessageClasses.MISPLACED)
+            _add_msg_if_exists(misplaced_ids, FeedbackMessages.misplaced, FeedbackMessages.MessageClasses.MISPLACED)
             _add_msg_if_exists(missing_ids, FeedbackMessages.not_placed, FeedbackMessages.MessageClasses.NOT_PLACED)
 
         grade_feedback_class = self.GRADE_FEEDBACK_CLASSES.get(answer_correctness, None)
@@ -956,6 +1013,7 @@ class DragAndDropBlock(
 
         item = self._get_item_definition(item_attempt['val'])
         is_correct = self._is_attempt_correct(item_attempt)
+        self.last_attempt_result = ''  # the answer has changed, so the last attempt's result no longer applies
         if item_attempt['zone'] is None:
             self.item_state.pop(str(item['id']), None)
             self._publish_item_to_bank_event(item['id'], is_correct)
@@ -1102,9 +1160,10 @@ class DragAndDropBlock(
     def _get_user_state(self):
         """ Get all user-specific data, and any applicable feedback """
         item_state = self._get_item_state()
-        # In assessment mode, we do not want to leak the correctness info for individual items to the frontend,
-        # so we remove "correct" from all items when in assessment mode.
-        if self.mode == Constants.ASSESSMENT_MODE:
+        # In assessment mode, we do not want to leak the correctness info for individual items to the frontend
+        # before an attempt has graded them, so we remove "correct" from all items unless the last attempt's
+        # result is showing. Any drop, Try again or Reset clears that result (`last_attempt_result`).
+        if self.mode == Constants.ASSESSMENT_MODE and not self.last_attempt_result:
             for item in item_state.values():
                 del item["correct"]
 
@@ -1114,13 +1173,16 @@ class DragAndDropBlock(
         else:
             is_finished = not self.attempts_remain
 
-        return {
+        user_state = {
             'items': item_state,
             'finished': is_finished,
             'attempts': self.attempts,
             'grade': self._get_weighted_earned_if_set(),
             'overall_feedback': self._present_feedback(overall_feedback_msgs)
         }
+        if attempt_result := self._get_attempt_result():
+            user_state['attempt_result'] = attempt_result
+        return user_state
 
     def _get_correct_state(self):
         """

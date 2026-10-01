@@ -17,8 +17,8 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         ngettext = function(strA, strB, n) {
             var translated = window.DragAndDropI18N.ngettext(strA, strB, n);
             var string = n == 1 ? strA : strB;
-            if (string === translated && 'gettext' in window) {
-                translated = window.gettext(strA, strB, n);
+            if (string === translated && 'ngettext' in window) {
+                translated = window.ngettext(strA, strB, n);
             }
             return translated;
         };
@@ -88,6 +88,10 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         return h('div', { key: key, innerHTML: item_content_html, className: "item-content" });
     };
 
+    var itemGripTemplate = function() {
+        return h('span.option-grip', {attributes: {'aria-hidden': 'true'}});
+    };
+
     var itemTemplate = function(item, ctx) {
         // Define properties
         var className = (item.class_name) ? item.class_name : "";
@@ -98,6 +102,9 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         if (item.widthPercent) {
             className += " specified-width";  // The author has specified a width for this item.
         }
+        if (item.result) {
+            className += " option-" + item.result;
+        }
         var attributes = {
             'role': 'button',
             'draggable': !item.drag_disabled,
@@ -107,10 +114,10 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
             'aria-live': 'polite'
         };
         var style = {};
-        if (item.background_color) {
+        // Author colours apply only as a pair, since one alone can clash with the default card (white on
+        // white), and never over a correct or incorrect mark.
+        if (item.background_color && item.color && !item.result) {
             style['background-color'] = item.background_color;
-        }
-        if (item.color) {
             style.color = item.color;
             // Ensure contrast between outline-color and background color
             // matches contrast between text color and background color:
@@ -124,10 +131,14 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
             style.top = top + 'px';
         }
         if (item.is_placed) {
-            var maxWidth = (item.widthPercent || 30) / 100;
-            var widthPercent = zone.width_percent / 100;
-            var possiblemaxWidth = ((1 / (widthPercent / maxWidth)) * 100);
-            style.maxWidth = (possiblemaxWidth < 100) ? possiblemaxWidth + '%' : '100%';
+            // Auto-width text items get no inline sizing: the stylesheet lets them fill their zone.
+            // Only items with an author-set width or an image are sized here.
+            if (item.widthPercent || item.has_image) {
+                var maxWidth = (item.widthPercent || 30) / 100;
+                var widthPercent = zone.width_percent / 100;
+                var possiblemaxWidth = ((1 / (widthPercent / maxWidth)) * 100);
+                style.maxWidth = (possiblemaxWidth < 100) ? possiblemaxWidth + '%' : '100%';
+            }
             if (item.widthPercent) {
                 style.width = style.maxWidth;
             }
@@ -161,7 +172,10 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         if (item.is_placed) {
             var zone_title = (gettext(zone.title) || gettext("Unknown Zone"));
             var description_content;
-            if (configuration.mode === DragAndDropBlock.ASSESSMENT_MODE && !ctx.showing_answer) {
+            if (item.result === 'incorrect') {
+                description_content = gettext('Incorrectly placed in: {zone_title}').replace('{zone_title}', zone_title);
+            } else if (item.result !== 'correct' &&
+                       configuration.mode === DragAndDropBlock.ASSESSMENT_MODE && !ctx.showing_answer) {
                 // In assessment mode placed items will "stick" even when not in correct zone.
                 description_content = gettext('Placed in: {zone_title}').replace('{zone_title}', zone_title);
             } else {
@@ -182,8 +196,15 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
             (item.grabbed) ? gettext(", draggable, grabbed") : gettext(", draggable")
         );
 
+        // The grip and the result icon are decoration for the Uber theme; the block's CSS hides them.
+        // The icon's span is always rendered (as .option-result-none without a result), so the number of
+        // children never changes: virtual-dom mis-patches a change in the middle of these children, next to the
+        // keyed description, and the next patch then fails ("insertBefore ... is not of type 'Node'").
+        var itemResultIcon = h(item.result ? 'span.option-result-icon' : 'span.option-result-none', {
+            attributes: {'aria-hidden': 'true'}
+        });
         var children = [
-            itemSpinnerTemplate(item), item_content, itemSRNote, item_description
+            itemGripTemplate(), itemSpinnerTemplate(item), item_content, itemResultIcon, itemSRNote, item_description
         ];
 
         // Unique key for virtual dom change tracking. Key must be different for
@@ -237,9 +258,41 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                     attributes: {draggable: false},
                     style: style
                 },
-                itemContentTemplate(item)
+                [itemGripTemplate(), itemContentTemplate(item)]
             )
         );
+    };
+
+    // The Figma "Drop zone" state, from the items now in the zone.
+    var zoneState = function(items_in_zone) {
+        if (items_in_zone.length === 0) {
+            return 'empty';
+        }
+        if (items_in_zone.some(function(item) { return item.result === 'incorrect'; })) {
+            return 'incorrect';
+        }
+        if (items_in_zone.every(function(item) { return item.result === 'correct'; })) {
+            return 'correct';
+        }
+        return 'filled';
+    };
+
+    // The hint at the top right of a zone. The copy is adapted from the Figma to the interactions
+    // this block supports: drag and keyboard, no tap-to-place.
+    var zoneHintText = function(zone_state, ctx) {
+        if (zone_state === 'correct') {
+            return gettext('Matches');
+        }
+        if (zone_state === 'incorrect') {
+            return gettext('Review this match');
+        }
+        if (ctx.finished) {
+            return '';
+        }
+        if (zone_state === 'filled') {
+            return gettext('Drag the card to move it');
+        }
+        return gettext('Drop a card here');
     };
 
     var zoneTemplate = function(zone, ctx) {
@@ -251,6 +304,17 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         // Only render placed items that are not currently being dragged out of the zone.
         var is_item_in_zone = function(i) { return i.is_placed && !i.is_dragged && (i.zone === zone.uid); };
         var items_in_zone = $.grep(ctx.items, is_item_in_zone);
+        var zone_state = zoneState(items_in_zone);
+        selector += '.zone-' + zone_state;
+        // Decoration for the Uber theme (the block's CSS hides it). Screen readers get the zone
+        // and item descriptions instead.
+        var zone_hint = null;
+        if (ctx.display_zone_labels && !ctx.showing_answer) {
+            zone_hint = h('p.zone-hint', {attributes: {'aria-hidden': 'true'}}, [
+                h('span.zone-hint-state', zoneHintText(zone_state, ctx)),
+                ctx.finished ? null : h('span.zone-hint-target', gettext('Drop it here'))
+            ]);
+        }
         var zone_description_id = zone.prefixed_uid + '-description';
         if (items_in_zone.length == 0) {
             var zone_description = h(
@@ -297,6 +361,7 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                             h('span.sr', gettext(', dropzone'))
                         ]
                     ),
+                    zone_hint,
                     h('p', { className: 'zone-description sr' }, gettext(zone.description) || gettext('droppable')),
                     h(item_wrapper, renderCollection(itemTemplate, items_in_zone, ctx)),
                     gettext(zone_description)
@@ -327,6 +392,55 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                 ])
             ])
         );
+    };
+
+    // The author's instructions (a short title and one line), in a panel between the problem text and the
+    // items.
+    var instructionsTemplate = function(ctx) {
+        if (!ctx.instructions_title && !ctx.instructions_text) {
+            return null;
+        }
+        return h('div.instructions', [
+            ctx.instructions_title ? h('p.instructions-title', ctx.instructions_title) : null,
+            ctx.instructions_text ? h('p.instructions-text', ctx.instructions_text) : null
+        ]);
+    };
+
+    // "1 of 3 cards placed", under the zones. Not while the answer is shown, which places every item.
+    var placedCountTemplate = function(ctx) {
+        if (ctx.showing_answer || !ctx.items.length) {
+            return null;
+        }
+        var template = ngettext(
+            '{placed} of {total} card placed',
+            '{placed} of {total} cards placed',
+            ctx.items.length
+        );
+        var text = template.replace('{placed}', ctx.placed_count).replace('{total}', ctx.items.length);
+        return h('div.placed-count', text);
+    };
+
+    // The "Correct" / "Not quite" card after an assessment attempt. Its body is the author's explanation once
+    // the Show Answer setting allows it (the server leaves it out until then), otherwise a short line.
+    // Hidden while the answer is shown, which shows the explanation itself.
+    var attemptResultTemplate = function(ctx) {
+        var result = ctx.attempt_result;
+        if (!result || ctx.showing_answer) {
+            return null;
+        }
+        var body = null;
+        if (result.explanation) {
+            body = h('div.attempt-result-body', {innerHTML: result.explanation});
+        } else if (!result.correct && ctx.attempts_remain) {
+            body = h('div.attempt-result-body', gettext("Some cards aren't in the right zone yet. Try again."));
+        }
+        return h(result.correct ? 'div.attempt-result.success' : 'div.attempt-result.error', {
+            attributes: {role: 'status'}
+        }, [
+            h('span.icon', {attributes: {'aria-hidden': true}}),
+            h('p.notification-message', result.correct ? gettext('Correct') : gettext('Not quite')),
+            body
+        ]);
     };
 
     var explanationTemplate = function (ctx) {
@@ -409,7 +523,7 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                         h("span.submit-label", [
                             submitSpinner,
                             ' ',  // whitespace between spinner icon and text
-                            gettext("Submit")
+                            ctx.show_try_again ? gettext("Try again") : gettext("Submit")
                         ])
                     ]
                 ),
@@ -664,20 +778,19 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         // items will be rendered by zoneTemplate.
         var items_in_bank = [];
         var items_dragged = [];
-        var items_placed = [];
+        // A wrong drop in standard mode keeps its place in the bank until it returns, so the zones don't jump.
+        var isReturning = function(item) {
+            return configuration.mode === DragAndDropBlock.STANDARD_MODE && item.result === 'incorrect';
+        };
         ctx.items.forEach(function(item) {
             if (item.is_dragged) {
                 items_dragged.push(item);
-                // Dragged items require a placeholder in the bank.
-                // In assessment mode, already placed items can be dragged.
-                if (item.is_placed) {
-                    items_placed.push(item)
-                } else {
+                // Items dragged out of the bank require a placeholder in the bank.
+                // In assessment mode, already placed items can be dragged; they have no place in the bank.
+                if (!item.is_placed) {
                     items_in_bank.push(item);
                 }
-            } else if (item.is_placed) {
-                items_placed.push(item);
-            } else {
+            } else if (!item.is_placed || isReturning(item)) {
                 items_in_bank.push(item);
             }
         });
@@ -693,18 +806,21 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
             item_bank_properties.attributes['aria-dropeffect'] = 'move';
             item_bank_properties.attributes['role'] = 'button';
         }
-        // Render items in the bank. If the item is currently being dragged, it should be
-        // rendered as a placeholder. All already placed items should also be rendered as
-        // placedholders (as the last content in the bank) to maintain original bank dimensions.
+        // Render items in the bank. If the item is currently being dragged or is about to return, it should be
+        // rendered as a placeholder.
         var bank_children = [];
         items_in_bank.forEach(function(item) {
-            if (item.is_dragged) {
+            if (item.is_dragged || isReturning(item)) {
                 bank_children.push(itemPlaceholderTemplate(item, ctx));
             } else {
                 bank_children.push(itemTemplate(item, ctx));
             }
         });
-        bank_children = bank_children.concat(renderCollection(itemPlaceholderTemplate, items_placed, ctx));
+        // Lets the empty bank open to one card high during a keyboard grab, as a keyboard drop target.
+        if (bank_children.length === 0 &&
+            configuration.mode === DragAndDropBlock.ASSESSMENT_MODE && !ctx.finished) {
+            item_bank_properties.className = 'item-bank-empty';
+        }
         var drag_container_style = {};
         var target_img_style = {};
         // If drag_container_max_width is null, we are going to measure the container width after this render.
@@ -727,6 +843,7 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                 h('div.problem', [
                     problemHeader,
                     h('p', {innerHTML: ctx.problem_html}),
+                    instructionsTemplate(ctx),
                     h('div.drag-container', {style: drag_container_style}, [
                         h('div.item-bank', item_bank_properties, bank_children),
                         h('div.target', {attributes: {'role': 'group', 'arial-label': gettext('Drop Targets')}}, [
@@ -742,6 +859,8 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                         ]),
                         h('div.dragged-items', renderCollection(itemTemplate, items_dragged, ctx)),
                     ]),
+                    placedCountTemplate(ctx),
+                    attemptResultTemplate(ctx),
                     explanationTemplate(ctx),
                     h('div.action', [
                         (ctx.show_submit_answer ? submitAnswerTemplate(ctx) : null),
@@ -794,6 +913,8 @@ function DragAndDropBlock(runtime, element, configuration) {
     var root = $root[0];
 
     var state = undefined;
+    // The zone (or bank) under an item that is being dragged; null when no drag is active.
+    var $last_target_zone = null;
     var bgImgNaturalWidth = undefined;  // pixel width of the background image (when not scaled)
     var containerMaxWidth = null;  // measured and set after first render
     var fixedHeaderHeight = 0; // measured in checkForFixedHeader
@@ -1181,6 +1302,21 @@ function DragAndDropBlock(runtime, element, configuration) {
     var applyState = function() {
         sendFeedbackPopupEvents();
         updateDOM();
+        restoreDragTargetClasses();
+    };
+
+    // While an item is dragged, the virtual DOM can rewrite the className of the zone under it (for
+    // example when a zone's state class changes), which drops the classes the drag handlers added.
+    var restoreDragTargetClasses = function() {
+        if (!$last_target_zone) {
+            return;
+        }
+        if ($last_target_zone.is('.zone')) {
+            $last_target_zone.addClass('zone-drop-target');
+        }
+        if (configuration.display_zone_borders_dragging) {
+            $last_target_zone.addClass('zone-border');
+        }
     };
 
     var sendFeedbackPopupEvents = function() {
@@ -1221,7 +1357,7 @@ function DragAndDropBlock(runtime, element, configuration) {
 
     var sr_clear_timeout = null;
 
-    var setScreenReaderMessages = function() {
+    var setScreenReaderMessages = function(first_message) {
         clearTimeout(sr_clear_timeout);
 
         var pluckMessages = function(feedback_items) {
@@ -1229,7 +1365,7 @@ function DragAndDropBlock(runtime, element, configuration) {
                 return item.message;
             });
         };
-        var messages = [];
+        var messages = first_message ? [first_message] : [];
         // In standard mode, it makes more sense to read the per-item feedback before overall feedback.
         if (state.feedback && configuration.mode === DragAndDropBlock.STANDARD_MODE) {
             messages = messages.concat(pluckMessages(state.feedback));
@@ -1351,12 +1487,31 @@ function DragAndDropBlock(runtime, element, configuration) {
         return false;
     };
 
+    // A wrong drop in standard mode that is about to return to the bank. It no longer counts as placed.
+    // (In assessment mode misplaced items stay in their zones.)
+    var isReturningToBank = function(item_state) {
+        return configuration.mode === DragAndDropBlock.STANDARD_MODE && item_state.correct === false;
+    };
+
+    // Assessment mode: hides the last attempt's result card and every item's mark. The server does the same
+    // when an item is dropped (drop_item) or on Try again (clear_attempt_result).
+    var clearAttemptResult = function() {
+        if (!state.attempt_result) {
+            return;
+        }
+        delete state.attempt_result;
+        Object.keys(state.items).forEach(function(item_id) {
+            delete state.items[item_id].correct;
+        });
+    };
+
     var returnItemToBank = function(item_id) {
         if (!state.items[item_id]) {
             // Nothing to do here, item is already in the bank.
             return;
         }
         delete state.items[item_id];
+        clearAttemptResult();  // the answer has changed since the last attempt
         applyState();
         var url = runtime.handlerUrl(element, 'drop_item');
         var data = {val: item_id, zone: null};
@@ -1397,6 +1552,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             zone_align: zone_align,
             submitting_location: true,
         };
+        clearAttemptResult();  // the answer has changed since the last attempt
 
         applyState();
         submitLocation(item_id, zone);
@@ -1405,12 +1561,21 @@ function DragAndDropBlock(runtime, element, configuration) {
     var countItemsInZone = function(zone, exclude_ids) {
         var ids_to_exclude = exclude_ids ? exclude_ids : [];
         return Object.keys(state.items).filter(function(item_id) {
-            return state.items[item_id].zone === zone && $.inArray(item_id, ids_to_exclude) === -1;
+            var item_state = state.items[item_id];
+            return item_state.zone === zone && !isReturningToBank(item_state) &&
+                $.inArray(item_id, ids_to_exclude) === -1;
+        }).length;
+    };
+
+    // A wrong drop about to return to the bank doesn't count as placed.
+    var placedCount = function() {
+        return Object.keys(state.items).filter(function(item_id) {
+            return !isReturningToBank(state.items[item_id]);
         }).length;
     };
 
     var canGoToBeginning = function() {
-        var all_items_placed = configuration.items.length === Object.keys(state.items).length;
+        var all_items_placed = configuration.items.length === placedCount();
         return !all_items_placed && !state.finished;
     };
 
@@ -1430,7 +1595,7 @@ function DragAndDropBlock(runtime, element, configuration) {
                     evt.stopPropagation();
                     state.keyboard_placement_mode = false;
                     if ($zone.is('.item-bank')) {
-                        delete state.items[$selectedItem.data('value')];
+                        returnItemToBank($selectedItem.data('value'));
                     } else {
                         placeGrabbedItem($zone);
                     }
@@ -1565,6 +1730,12 @@ function DragAndDropBlock(runtime, element, configuration) {
             item.max_top = container_height - $item.outerHeight();
             item.drag_position = centered_position;
             grabItem($item, 'mouse');
+            // The theme can size the dragged card differently from where it was picked up (full width on phones).
+            var $dragged = $root.find('.dragged-items .option');
+            if ($dragged.length) {
+                item.max_left = container_width - $dragged.outerWidth();
+                item.max_top = container_height - $dragged.outerHeight();
+            }
 
             // Animate the item back to its original position in the bank.
             var revertDrag = function() {
@@ -1592,22 +1763,16 @@ function DragAndDropBlock(runtime, element, configuration) {
             };
 
             var raf_id = null;
-            var $last_target_zone = null;
+            var setDragTarget = function($zone) {
+                if ($last_target_zone && !($zone && $zone.is($last_target_zone))) {
+                    $last_target_zone.removeClass('zone-drop-target zone-border');
+                }
+                $last_target_zone = $zone || null;
+                restoreDragTargetClasses();
+            };
             var onDragMove = function(evt) {
                 evt.preventDefault();
-                var $zone = getTargetZone(evt);
-                if (configuration.display_zone_borders_dragging) {
-                    if ($zone) {
-                        if ($last_target_zone && $zone.attr('id') !== $last_target_zone.attr('id')) {
-                            $last_target_zone.removeClass('zone-border');
-                        }
-                        $zone.addClass('zone-border');
-                        $last_target_zone = $zone;
-                    } else if ($last_target_zone) {
-                        $last_target_zone.removeClass('zone-border');
-                        $last_target_zone = null;
-                    }
-                }
+                setDragTarget(getTargetZone(evt));
                 if (raf_id) {
                     cancelAnimationFrame(raf_id);
                 }
@@ -1665,6 +1830,7 @@ function DragAndDropBlock(runtime, element, configuration) {
                 if (raf_id) {
                     cancelAnimationFrame(raf_id);
                 }
+                setDragTarget(null);
                 if (evt.type === 'mouseup') {
                     $document.off('mousemove', onDragMove);
                     $document.off('mouseup', onDragEnd);
@@ -1677,6 +1843,11 @@ function DragAndDropBlock(runtime, element, configuration) {
                     return;
                 }
                 var $zone = getTargetZone(evt);
+                if (!$zone && configuration.mode === DragAndDropBlock.ASSESSMENT_MODE && state.items[item_id]) {
+                    // A placed card dropped outside every zone goes back to the bank, so the bank doesn't
+                    // need to keep an empty drop area once every card is placed.
+                    $zone = $root.find('.item-bank');
+                }
                 if ($zone) {
                     delete item.drag_position;
                     if ($zone.is('.item-bank')) {
@@ -1687,10 +1858,6 @@ function DragAndDropBlock(runtime, element, configuration) {
                     releaseGrabbedItems();
                 } else {
                     revertDrag();
-                }
-                if (configuration.display_zone_borders_dragging && $last_target_zone) {
-                    $last_target_zone.removeClass('zone-border');
-                    $last_target_zone = null;
                 }
             };
 
@@ -1780,6 +1947,8 @@ function DragAndDropBlock(runtime, element, configuration) {
         // Mirror tap-selection state on the container so the :has() fallback CSS rule
         // (.drag-container.has-tap-selection .zone) works in browsers without :has() support.
         $root.find('.drag-container').toggleClass('has-tap-selection', interaction_type === 'tap');
+        // Lets the theme show the focused zone as the drop Target during keyboard placement.
+        $root.find('.drag-container').toggleClass('has-keyboard-selection', interaction_type === 'keyboard');
         closePopup(false);
         applyState();
     };
@@ -1790,7 +1959,64 @@ function DragAndDropBlock(runtime, element, configuration) {
             delete item.grabbed_with;
         });
         $root.find('.drag-container').removeClass('has-tap-selection');
+        $root.find('.drag-container').removeClass('has-keyboard-selection');
         applyState();
+    };
+
+    // In standard mode a wrong drop shows as Incorrect for a moment, then returns to the bank.
+    // The server never stored it, so only the client state changes.
+    // The pending timers, by item id, so that a Reset can cancel them.
+    var incorrect_timers = {};
+    // For a wrong drop that left focus on the fallback element (see submitLocation), by item id: the
+    // element that got focus. The returned card takes focus only if focus is still on that element.
+    var incorrect_focus = {};
+
+    var clearIncorrectTimers = function() {
+        Object.keys(incorrect_timers).forEach(function(item_id) {
+            clearTimeout(incorrect_timers[item_id]);
+        });
+        incorrect_timers = {};
+        incorrect_focus = {};
+    };
+
+    var INCORRECT_RETURN_DELAY_MS = 1000;
+
+    // Whether the learner is in the middle of a keyboard placement, a grab or a drag.
+    // Automatic changes must not move focus then.
+    var interactionInProgress = function() {
+        if (state.keyboard_placement_mode) {
+            return true;
+        }
+        return configuration.items.some(function(item) {
+            return Boolean(item.grabbed) || Boolean(item.drag_position);
+        });
+    };
+
+    var returnIncorrectItemLater = function(item_id) {
+        incorrect_timers[item_id] = setTimeout(function() {
+            delete incorrect_timers[item_id];
+            var focus_element = incorrect_focus[item_id];
+            delete incorrect_focus[item_id];
+            var item_state = state.items[item_id];
+            if (item_state && item_state.correct === false) {
+                // Move focus to the returned card only if nothing has taken focus since the drop
+                // (a popup, a button, another card) and no other grab or drag has started.
+                var move_focus = Boolean(focus_element) && document.activeElement === focus_element &&
+                    !interactionInProgress();
+                delete state.items[item_id];
+                applyState();
+                if (move_focus) {
+                    $root.find('.item-bank .option[data-value="' + item_id + '"]').first().focus();
+                }
+            }
+        }, INCORRECT_RETURN_DELAY_MS);
+    };
+
+    // Read out for a wrong drop in standard mode, which opens no feedback popup.
+    var incorrectPlacementMessage = function(zone_uid) {
+        var zone = configuration.zones.filter(function(z) { return z.uid === zone_uid; })[0];
+        var zone_title = (zone && gettext(zone.title)) || gettext('Unknown Zone');
+        return gettext('Incorrectly placed in: {zone_title}').replace('{zone_title}', zone_title);
     };
 
     var submitLocation = function(item_id, zone) {
@@ -1806,20 +2032,23 @@ function DragAndDropBlock(runtime, element, configuration) {
         $.post(url, JSON.stringify(data), 'json')
             .done(function(data){
                 state.items[item_id].submitting_location = false;
-                // In standard mode we immediately return item to the bank if dropped on wrong zone.
+                // In standard mode an item dropped on a wrong zone shows as Incorrect, then returns to the bank.
                 // In assessment mode we leave it in the chosen zone until explicit answer submission.
                 if (configuration.mode === DragAndDropBlock.STANDARD_MODE) {
                     state.last_action_correct = data.correct;
-                    state.feedback = data.feedback;
+                    // No feedback popup for a wrong drop: the Incorrect mark on the card says it.
+                    state.feedback = data.correct ? data.feedback : [];
                     state.grade = data.grade;
+                    // Keep the result on the item: Correct stays, Incorrect shows until it returns to the bank.
+                    state.items[item_id].correct = Boolean(data.correct);
                     if (!data.correct) {
-                        delete state.items[item_id];
+                        returnIncorrectItemLater(item_id);
                     }
                     if (data.finished) {
                         state.finished = true;
                         state.overall_feedback = data.overall_feedback;
                     }
-                    setScreenReaderMessages();
+                    setScreenReaderMessages(data.correct ? null : incorrectPlacementMessage(zone));
                 }
                 applyState();
                 if (state.feedback && state.feedback.length > 0) {
@@ -1830,6 +2059,12 @@ function DragAndDropBlock(runtime, element, configuration) {
                         focusFirstDraggable();
                     } else {
                         focusSubmitButton();
+                        // No popup and no bank card to focus: focus fell back to the submit button or the
+                        // first zone. If this drop is about to return, remember where focus went, so the
+                        // returned card can take it, but only if nothing else has by then.
+                        if (incorrect_timers[item_id]) {
+                            incorrect_focus[item_id] = document.activeElement;
+                        }
                     };
                 }
             })
@@ -1878,6 +2113,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             url: runtime.handlerUrl(element, 'reset'),
             data: '{}',
         }).done(function(data) {
+            clearIncorrectTimers();
             state = data;
             applyState();
             focusFirstDraggable();
@@ -1901,12 +2137,27 @@ function DragAndDropBlock(runtime, element, configuration) {
         }).always(function() {
             state.show_answer_spinner = false;
             applyState();
-            $root.find('.item-bank').focus();
+            // With no decoys the bank is empty and collapsed, so focus the first zone instead.
+            var $bank = $root.find('.item-bank');
+            ($bank.find('.option').length ? $bank : $root.find('.target .zone').first()).focus();
+        });
+    };
+
+    // After an assessment attempt, marks every placed item correct unless the server reported it as
+    // misplaced. Ids are compared as strings, because state keys are strings.
+    var markAttemptResults = function(misplaced_ids) {
+        var misplaced = (misplaced_ids || []).map(String);
+        Object.keys(state.items).forEach(function(item_id) {
+            state.items[item_id].correct = misplaced.indexOf(String(item_id)) === -1;
         });
     };
 
     var doAttempt = function(evt) {
         evt.preventDefault();
+        if (showTryAgain()) {
+            tryAgain();
+            return;
+        }
         state.submit_spinner = true;
         applyState();
 
@@ -1917,27 +2168,50 @@ function DragAndDropBlock(runtime, element, configuration) {
         }).done(function(data){
             state.attempts = data.attempts;
             state.grade = data.grade;
-            state.feedback = data.feedback;
+            // No feedback popup: data.feedback only holds misplaced items' incorrect text, and the marks and the
+            // result card say it instead.
+            state.feedback = [];
             state.overall_feedback = data.overall_feedback;
             state.answer_available = data.answer_available;
             state.last_action_correct = data.correct;
-            if (attemptsRemain()) {
-                data.misplaced_items.forEach(function(misplaced_item_id) {
-                    delete state.items[misplaced_item_id]
-                });
-            } else {
+            state.attempt_result = data.attempt_result;
+            markAttemptResults(data.misplaced_items);
+            if (!attemptsRemain()) {
                 state.finished = true;
             }
             setScreenReaderMessages();
         }).always(function() {
             state.submit_spinner = false;
             applyState();
-            focusItemFeedbackPopup() || focusSuccessFeedback() || focusFirstDraggable();
+            if (showTryAgain()) {
+                focusSubmitButton();
+            } else {
+                focusItemFeedbackPopup() || focusSuccessFeedback() || focusFirstDraggable();
+            }
         });
     };
 
     var canSubmitAttempt = function() {
-        return Object.keys(state.items).length > 0 && !isPastDue() && attemptsRemain() && !submittingLocation();
+        return Object.keys(state.items).length > 0 && !isPastDue() && attemptsRemain() && !submittingLocation() &&
+            !state.clearing_attempt_result;
+    };
+
+    // After a wrong assessment attempt with attempts left, the Submit button reads "Try again". Pressing it
+    // clears the result and the marks, without using an attempt; the items stay where they are.
+    var showTryAgain = function() {
+        return Boolean(state.attempt_result && !state.attempt_result.correct && attemptsRemain() && !state.finished);
+    };
+
+    // Submit stays disabled until the server has cleared the result, so a quick Submit can't be cleared by it.
+    var tryAgain = function() {
+        clearAttemptResult();
+        state.clearing_attempt_result = true;
+        applyState();
+        $.post(runtime.handlerUrl(element, 'clear_attempt_result'), '{}', 'json').always(function() {
+            delete state.clearing_attempt_result;
+            applyState();
+            focusSubmitButton();
+        });
     };
 
     var canReset = function() {
@@ -1978,6 +2252,21 @@ function DragAndDropBlock(runtime, element, configuration) {
         return result;
     }
 
+    // The result mark a placed item shows: 'correct', 'incorrect', or null for no mark. There are no
+    // marks while Show Answer is on, because the answer state marks every item correct.
+    var itemResult = function(item_user_state) {
+        if (!item_user_state || state.showing_answer) {
+            return null;
+        }
+        if (item_user_state.correct === true) {
+            return 'correct';
+        }
+        if (item_user_state.correct === false) {
+            return 'incorrect';
+        }
+        return null;
+    };
+
     var render = function() {
         var items = configuration.items.map(function(item) {
             var item_user_state = state.items[item.id];
@@ -2011,6 +2300,7 @@ function DragAndDropBlock(runtime, element, configuration) {
                 max_left: item.max_left,
                 max_top: item.max_top,
                 is_placed: Boolean(item_user_state),
+                result: itemResult(item_user_state),
                 widthPercent: item.widthPercent, // widthPercent may be undefined (auto width)
                 imgNaturalWidth: item.imgNaturalWidth,
                 noPadding: item.noPadding,
@@ -2045,6 +2335,8 @@ function DragAndDropBlock(runtime, element, configuration) {
             weighted_max_score: configuration.weighted_max_score,
             problem_html: configuration.problem_text,
             show_problem_header: configuration.show_problem_header,
+            instructions_title: configuration.instructions_title,
+            instructions_text: configuration.instructions_text,
             show_submit_answer: configuration.mode == DragAndDropBlock.ASSESSMENT_MODE,
             show_show_answer: canShowAnswer(),
             target_img_src: configuration.target_img_expanded_url,
@@ -2066,6 +2358,11 @@ function DragAndDropBlock(runtime, element, configuration) {
             disable_submit_button: !canSubmitAttempt(),
             submit_spinner: state.submit_spinner,
             showing_answer: state.showing_answer,
+            attempt_result: state.attempt_result,
+            attempts_remain: attemptsRemain(),
+            placed_count: placedCount(),
+            show_try_again: showTryAgain(),
+            finished: Boolean(state.finished),
             show_answer_spinner: state.show_answer_spinner,
             disable_go_to_beginning_button: !canGoToBeginning(),
             show_go_to_beginning_button: state.go_to_beginning_button_visible,
