@@ -171,6 +171,14 @@
         flex-shrink: 0;
         max-width: calc(100% - 10px);
     }
+
+    /* Every text item in the bank is the bank's full width (less its 5px margins), whatever its text.
+       Also while it's dragged, so it doesn't change size mid-drag. Items with an author-set width
+       (.specified-width) or an image keep the size drag_and_drop.js gives them. */
+    .xblock--drag-and-drop .drag-container .item-bank .option:not(.specified-width):not(.option-with-image),
+    .xblock--drag-and-drop .drag-container .dragged-items .option:not(.specified-width):not(.option-with-image) {
+        width: calc(100% - 10px);
+    }
 }
 
 .xblock--drag-and-drop .drag-container .option.specified-width img {
