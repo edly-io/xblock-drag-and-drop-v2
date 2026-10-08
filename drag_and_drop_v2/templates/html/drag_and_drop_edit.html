@@ -87,6 +87,26 @@
                     </div>
 
                     <label class="h4">
+                        <span>{% trans fields.instructions_title.display_name %}</span>
+                        <input class="instructions-title"
+                               value="{{ self.instructions_title }}"
+                               aria-describedby="instructions-title-description-{{id_suffix}}" />
+                    </label>
+                    <div id="instructions-title-description-{{id_suffix}}" class="form-help">
+                      {% trans fields.instructions_title.help %}
+                    </div>
+
+                    <label class="h4">
+                        <span>{% trans fields.instructions_text.display_name %}</span>
+                        <input class="instructions-text"
+                               value="{{ self.instructions_text }}"
+                               aria-describedby="instructions-text-description-{{id_suffix}}" />
+                    </label>
+                    <div id="instructions-text-description-{{id_suffix}}" class="form-help">
+                      {% trans fields.instructions_text.help %}
+                    </div>
+
+                    <label class="h4">
                         <span>{% trans "Introductory feedback" %}</span>
                         <textarea class="intro-feedback">{% trans self.data.feedback.start %}</textarea>
                     </label>

@@ -12,6 +12,8 @@
     "answer_available": false,
     "problem_text": "Can you solve this drag-and-drop problem?",
     "show_problem_header": true,
+    "instructions_title": "Match each card",
+    "instructions_text": "Drag each card to the zone it belongs in.",
     "target_img_expanded_url": "http://placehold.it/800x600",
     "target_img_description": "This describes the target image",
     "item_background_color": null,
