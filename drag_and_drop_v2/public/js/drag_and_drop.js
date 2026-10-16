@@ -179,8 +179,6 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                 // In assessment mode placed items will "stick" even when not in correct zone.
                 description_content = gettext('Placed in: {zone_title}').replace('{zone_title}', zone_title);
             } else {
-                // In standard mode item is immediately returned back to the bank if dropped on a wrong zone,
-                // so all placed items are always in the correct zone.
                 description_content = gettext('Correctly placed in: {zone_title}').replace('{zone_title}', zone_title);
             }
             var item_description_id = configuration.url_name + '-item-' + item.value + '-description';
@@ -778,19 +776,15 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         // items will be rendered by zoneTemplate.
         var items_in_bank = [];
         var items_dragged = [];
-        // A wrong drop in standard mode keeps its place in the bank until it returns, so the zones don't jump.
-        var isReturning = function(item) {
-            return configuration.mode === DragAndDropBlock.STANDARD_MODE && item.result === 'incorrect';
-        };
         ctx.items.forEach(function(item) {
             if (item.is_dragged) {
                 items_dragged.push(item);
                 // Items dragged out of the bank require a placeholder in the bank.
-                // In assessment mode, already placed items can be dragged; they have no place in the bank.
+                // Already placed items can be dragged; they have no place in the bank.
                 if (!item.is_placed) {
                     items_in_bank.push(item);
                 }
-            } else if (!item.is_placed || isReturning(item)) {
+            } else if (!item.is_placed) {
                 items_in_bank.push(item);
             }
         });
@@ -806,19 +800,17 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
             item_bank_properties.attributes['aria-dropeffect'] = 'move';
             item_bank_properties.attributes['role'] = 'button';
         }
-        // Render items in the bank. If the item is currently being dragged or is about to return, it should be
-        // rendered as a placeholder.
+        // Render items in the bank. If the item is currently being dragged, it should be rendered as a placeholder.
         var bank_children = [];
         items_in_bank.forEach(function(item) {
-            if (item.is_dragged || isReturning(item)) {
+            if (item.is_dragged) {
                 bank_children.push(itemPlaceholderTemplate(item, ctx));
             } else {
                 bank_children.push(itemTemplate(item, ctx));
             }
         });
-        // Lets the empty bank open to one card high during a keyboard grab, as a keyboard drop target.
-        if (bank_children.length === 0 &&
-            configuration.mode === DragAndDropBlock.ASSESSMENT_MODE && !ctx.finished) {
+        // Lets the empty bank open to one card high while a placed decoy is grabbed, as a keyboard drop target.
+        if (bank_children.length === 0 && ctx.can_return_to_bank) {
             item_bank_properties.className = 'item-bank-empty';
         }
         var drag_container_style = {};
@@ -1432,8 +1424,7 @@ function DragAndDropBlock(runtime, element, configuration) {
 
     var focusNextZone = function(evt, $currentZone) {
         var zones = $root.find('.target .zone').toArray();
-        // In assessment mode, item bank is a valid drop zone
-        if (configuration.mode === DragAndDropBlock.ASSESSMENT_MODE) {
+        if (canReturnGrabbedToBank()) {
             zones.push($root.find('.item-bank')[0]);
         }
         var idx = zones.indexOf($currentZone[0]);
@@ -1487,21 +1478,12 @@ function DragAndDropBlock(runtime, element, configuration) {
         return false;
     };
 
-    // A wrong drop in standard mode that is about to return to the bank. It no longer counts as placed.
-    // (In assessment mode misplaced items stay in their zones.)
-    var isReturningToBank = function(item_state) {
-        return configuration.mode === DragAndDropBlock.STANDARD_MODE && item_state.correct === false;
-    };
-
     // Assessment mode: hides the last attempt's result card and every item's mark. The server does the same
     // when an item is dropped (drop_item) or on Try again (clear_attempt_result).
-    var clearAttemptResult = function() {
-        if (!state.attempt_result) {
-            return;
-        }
-        delete state.attempt_result;
-        Object.keys(state.items).forEach(function(item_id) {
-            delete state.items[item_id].correct;
+    // Only a placed decoy (an item with no zone) can go back to the bank; every other card moves between zones.
+    var canReturnGrabbedToBank = function() {
+        return configuration.items.some(function(item) {
+            return item.grabbed && item.decoy && Boolean(state.items[item.id]);
         });
     };
 
@@ -1515,7 +1497,27 @@ function DragAndDropBlock(runtime, element, configuration) {
         applyState();
         var url = runtime.handlerUrl(element, 'drop_item');
         var data = {val: item_id, zone: null};
-        $.post(url, JSON.stringify(data), 'json');
+        $.post(url, JSON.stringify(data), 'json').done(function(data) {
+            // In standard mode the decoy back in the bank may be the last change the problem needed.
+            if (configuration.mode === DragAndDropBlock.STANDARD_MODE) {
+                state.grade = data.grade;
+                if (data.finished) {
+                    state.finished = true;
+                    state.overall_feedback = data.overall_feedback;
+                }
+                applyState();
+            }
+        });
+    };
+
+    var clearAttemptResult = function() {
+        if (!state.attempt_result) {
+            return;
+        }
+        delete state.attempt_result;
+        Object.keys(state.items).forEach(function(item_id) {
+            delete state.items[item_id].correct;
+        });
     };
 
     var placeGrabbedItem = function($zone) {
@@ -1562,16 +1564,12 @@ function DragAndDropBlock(runtime, element, configuration) {
         var ids_to_exclude = exclude_ids ? exclude_ids : [];
         return Object.keys(state.items).filter(function(item_id) {
             var item_state = state.items[item_id];
-            return item_state.zone === zone && !isReturningToBank(item_state) &&
-                $.inArray(item_id, ids_to_exclude) === -1;
+            return item_state.zone === zone && $.inArray(item_id, ids_to_exclude) === -1;
         }).length;
     };
 
-    // A wrong drop about to return to the bank doesn't count as placed.
     var placedCount = function() {
-        return Object.keys(state.items).filter(function(item_id) {
-            return !isReturningToBank(state.items[item_id]);
-        }).length;
+        return Object.keys(state.items).length;
     };
 
     var canGoToBeginning = function() {
@@ -1663,12 +1661,9 @@ function DragAndDropBlock(runtime, element, configuration) {
         };
 
         var isValidDropTarget = function(element) {
-            var valid = element.classList.contains('zone');
-            if (!valid && configuration.mode === DragAndDropBlock.ASSESSMENT_MODE) {
-                // In assessment mode, items can be dropped back into the item bank.
-                valid = element.classList.contains('item-bank');
-            }
-            return valid;
+            // A placed card can move to another zone; only a decoy can go back to the bank.
+            return element.classList.contains('zone') ||
+                (element.classList.contains('item-bank') && canReturnGrabbedToBank());
         };
 
         // If the drag ended on a valid target zone, returns the zone, otherwise returns null;
@@ -1842,12 +1837,8 @@ function DragAndDropBlock(runtime, element, configuration) {
                     revertDrag();
                     return;
                 }
+                // Dropped outside every zone, the card animates back to where it was: its zone or the bank.
                 var $zone = getTargetZone(evt);
-                if (!$zone && configuration.mode === DragAndDropBlock.ASSESSMENT_MODE && state.items[item_id]) {
-                    // A placed card dropped outside every zone goes back to the bank, so the bank doesn't
-                    // need to keep an empty drop area once every card is placed.
-                    $zone = $root.find('.item-bank');
-                }
                 if ($zone) {
                     delete item.drag_position;
                     if ($zone.is('.item-bank')) {
@@ -1963,55 +1954,6 @@ function DragAndDropBlock(runtime, element, configuration) {
         applyState();
     };
 
-    // In standard mode a wrong drop shows as Incorrect for a moment, then returns to the bank.
-    // The server never stored it, so only the client state changes.
-    // The pending timers, by item id, so that a Reset can cancel them.
-    var incorrect_timers = {};
-    // For a wrong drop that left focus on the fallback element (see submitLocation), by item id: the
-    // element that got focus. The returned card takes focus only if focus is still on that element.
-    var incorrect_focus = {};
-
-    var clearIncorrectTimers = function() {
-        Object.keys(incorrect_timers).forEach(function(item_id) {
-            clearTimeout(incorrect_timers[item_id]);
-        });
-        incorrect_timers = {};
-        incorrect_focus = {};
-    };
-
-    var INCORRECT_RETURN_DELAY_MS = 1000;
-
-    // Whether the learner is in the middle of a keyboard placement, a grab or a drag.
-    // Automatic changes must not move focus then.
-    var interactionInProgress = function() {
-        if (state.keyboard_placement_mode) {
-            return true;
-        }
-        return configuration.items.some(function(item) {
-            return Boolean(item.grabbed) || Boolean(item.drag_position);
-        });
-    };
-
-    var returnIncorrectItemLater = function(item_id) {
-        incorrect_timers[item_id] = setTimeout(function() {
-            delete incorrect_timers[item_id];
-            var focus_element = incorrect_focus[item_id];
-            delete incorrect_focus[item_id];
-            var item_state = state.items[item_id];
-            if (item_state && item_state.correct === false) {
-                // Move focus to the returned card only if nothing has taken focus since the drop
-                // (a popup, a button, another card) and no other grab or drag has started.
-                var move_focus = Boolean(focus_element) && document.activeElement === focus_element &&
-                    !interactionInProgress();
-                delete state.items[item_id];
-                applyState();
-                if (move_focus) {
-                    $root.find('.item-bank .option[data-value="' + item_id + '"]').first().focus();
-                }
-            }
-        }, INCORRECT_RETURN_DELAY_MS);
-    };
-
     // Read out for a wrong drop in standard mode, which opens no feedback popup.
     var incorrectPlacementMessage = function(zone_uid) {
         var zone = configuration.zones.filter(function(z) { return z.uid === zone_uid; })[0];
@@ -2032,19 +1974,15 @@ function DragAndDropBlock(runtime, element, configuration) {
         $.post(url, JSON.stringify(data), 'json')
             .done(function(data){
                 state.items[item_id].submitting_location = false;
-                // In standard mode an item dropped on a wrong zone shows as Incorrect, then returns to the bank.
-                // In assessment mode we leave it in the chosen zone until explicit answer submission.
+                // In standard mode the item is marked Correct or Incorrect right away and stays in the zone.
+                // In assessment mode it is only marked after explicit answer submission.
                 if (configuration.mode === DragAndDropBlock.STANDARD_MODE) {
                     state.last_action_correct = data.correct;
                     // No feedback popup for any drop: the Correct / Incorrect mark on the card says it. A correct
                     // drop's author feedback is still read out below.
                     state.feedback = [];
                     state.grade = data.grade;
-                    // Keep the result on the item: Correct stays, Incorrect shows until it returns to the bank.
                     state.items[item_id].correct = Boolean(data.correct);
-                    if (!data.correct) {
-                        returnIncorrectItemLater(item_id);
-                    }
                     if (data.finished) {
                         state.finished = true;
                         state.overall_feedback = data.overall_feedback;
@@ -2062,13 +2000,7 @@ function DragAndDropBlock(runtime, element, configuration) {
                         focusFirstDraggable();
                     } else {
                         focusSubmitButton();
-                        // No popup and no bank card to focus: focus fell back to the submit button or the
-                        // first zone. If this drop is about to return, remember where focus went, so the
-                        // returned card can take it, but only if nothing else has by then.
-                        if (incorrect_timers[item_id]) {
-                            incorrect_focus[item_id] = document.activeElement;
-                        }
-                    };
+                    }
                 }
             })
             .fail(function (data) {
@@ -2116,7 +2048,6 @@ function DragAndDropBlock(runtime, element, configuration) {
             url: runtime.handlerUrl(element, 'reset'),
             data: '{}',
         }).done(function(data) {
-            clearIncorrectTimers();
             state = data;
             applyState();
             focusFirstDraggable();
@@ -2278,11 +2209,11 @@ function DragAndDropBlock(runtime, element, configuration) {
                 grabbed = item.grabbed;
             }
             var drag_disabled;
-            // In standard mode items placed in correct zone are no longer draggable.
-            // In assessment mode items are draggable and can be moved between zones
-            // until user explicitly submits the problem.
+            // Placed items can be moved between zones, never back to the bank. In standard mode items placed in
+            // the correct zone are no longer draggable. In assessment mode every item is draggable until the
+            // user explicitly submits the problem.
             if (configuration.mode === DragAndDropBlock.STANDARD_MODE) {
-                drag_disabled = Boolean(state.finished || item_user_state);
+                drag_disabled = Boolean(state.finished || (item_user_state && item_user_state.correct));
             } else {
                 drag_disabled = Boolean(state.finished);
             }
@@ -2321,10 +2252,10 @@ function DragAndDropBlock(runtime, element, configuration) {
             return itemProperties;
         });
 
-        // In assessment mode, it is possible to move items back to the bank, so the bank should be able to
-        // gain focus while keyboard placement is in progress.
-        var item_bank_focusable = (state.keyboard_placement_mode || state.showing_answer) &&
-            configuration.mode === DragAndDropBlock.ASSESSMENT_MODE;
+        // While a placed decoy is grabbed the bank is a drop target, so it must be able to gain focus.
+        var can_return_to_bank = state.keyboard_placement_mode && canReturnGrabbedToBank();
+        var item_bank_focusable = can_return_to_bank ||
+            (state.showing_answer && configuration.mode === DragAndDropBlock.ASSESSMENT_MODE);
 
         var context = {
             drag_container_max_width: containerMaxWidth,
@@ -2354,6 +2285,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             grade: state.grade,
             last_action_correct: state.last_action_correct,
             item_bank_focusable: item_bank_focusable,
+            can_return_to_bank: can_return_to_bank,
             feedback_messages: state.feedback,
             overall_feedback_messages: state.overall_feedback,
             explanation: state.explanation,
