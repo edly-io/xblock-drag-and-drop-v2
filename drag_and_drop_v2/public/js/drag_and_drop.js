@@ -2036,8 +2036,9 @@ function DragAndDropBlock(runtime, element, configuration) {
                 // In assessment mode we leave it in the chosen zone until explicit answer submission.
                 if (configuration.mode === DragAndDropBlock.STANDARD_MODE) {
                     state.last_action_correct = data.correct;
-                    // No feedback popup for a wrong drop: the Incorrect mark on the card says it.
-                    state.feedback = data.correct ? data.feedback : [];
+                    // No feedback popup for any drop: the Correct / Incorrect mark on the card says it. A correct
+                    // drop's author feedback is still read out below.
+                    state.feedback = [];
                     state.grade = data.grade;
                     // Keep the result on the item: Correct stays, Incorrect shows until it returns to the bank.
                     state.items[item_id].correct = Boolean(data.correct);
@@ -2048,7 +2049,9 @@ function DragAndDropBlock(runtime, element, configuration) {
                         state.finished = true;
                         state.overall_feedback = data.overall_feedback;
                     }
-                    setScreenReaderMessages(data.correct ? null : incorrectPlacementMessage(zone));
+                    setScreenReaderMessages(data.correct
+                        ? data.feedback.map(function(f) { return f.message; }).join(' ') || null
+                        : incorrectPlacementMessage(zone));
                 }
                 applyState();
                 if (state.feedback && state.feedback.length > 0) {
