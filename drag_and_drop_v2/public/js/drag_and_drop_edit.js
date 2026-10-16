@@ -159,10 +159,11 @@ function DragAndDropEditBlock(runtime, element, params) {
                     var zone_tab = _fn.build.$el.zones.tab;
                     var radio_selector = '.background-image-type input[value=' + image_type + ']';
                     zone_tab.find(radio_selector).prop('checked', true).trigger('change');
-                    zone_tab.find('.autozone-layout-cols').val(image_params.cols || 3);
-                    zone_tab.find('.autozone-layout-rows').val(image_params.rows || 1);
-                    zone_tab.find('.autozone-size-width').val(image_params.zone_width || 200);
-                    zone_tab.find('.autozone-size-height').val(image_params.zone_height || 200);
+                    // The fallbacks match the default layout in default_data.py: one column of three 350 x 120 zones.
+                    zone_tab.find('.autozone-layout-cols').val(image_params.cols || 1);
+                    zone_tab.find('.autozone-layout-rows').val(image_params.rows || 3);
+                    zone_tab.find('.autozone-size-width').val(image_params.zone_width || 350);
+                    zone_tab.find('.autozone-size-height').val(image_params.zone_height || 120);
                 },
 
                 // Examine the image src to determine whether the background image has been auto generated.
