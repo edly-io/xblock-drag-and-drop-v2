@@ -108,23 +108,49 @@ function DragAndDropEditBlock(runtime, element, params) {
 
                 validate: function() {
                     var fields = $element.find('.tab').not('.hidden').find('input, textarea');
-                    var success = true;
+                    var $invalid = $();
+                    _fn.build.clearFormError();
                     fields.each(function(index, field) {
                         field = $(field);
                         // Right now our only check is if a field is set or not.
-                        field.removeClass('field-error');
+                        _fn.build.clearFieldError(field);
                         if (! field[0].checkValidity()) {
-                            field.addClass('field-error');
-                            success = false;
+                            var message = field[0].validity.valueMissing ?
+                                gettext("This field is required.") : field[0].validationMessage;
+                            _fn.build.showFieldError(field, message);
+                            $invalid = $invalid.add(field);
                         }
                     });
-                    if (! success) {
-                        runtime.notify('error', {
-                            'title': gettext("There was an error with your form."),
-                            'message': gettext("Please check over your submission.")
-                        });
+                    if ($invalid.length) {
+                        _fn.build.showFormError(gettext("Some fields need your attention before you can continue."));
+                        $invalid[0].scrollIntoView({block: 'center'});
+                        $invalid.first().focus();
                     }
-                    return success
+                    return $invalid.length === 0;
+                },
+
+                // The Studio runtime doesn't always show runtime.notify('error') (the course authoring MFE doesn't),
+                // so form errors are also shown in the editor itself: one by the buttons, and one under each field.
+                showFormError: function(message) {
+                    $element.find('.form-error').text(message).removeClass('hidden');
+                    runtime.notify('error', {
+                        'title': gettext("There was an error with your form."),
+                        'message': message
+                    });
+                },
+
+                clearFormError: function() {
+                    $element.find('.form-error').text('').addClass('hidden');
+                },
+
+                showFieldError: function(field, message) {
+                    field.addClass('field-error').attr('aria-invalid', 'true');
+                    $('<div class="field-error-message"></div>').text(message).insertAfter(field);
+                },
+
+                clearFieldError: function(field) {
+                    field.removeClass('field-error').removeAttr('aria-invalid');
+                    field.next('.field-error-message').remove();
                 },
 
                 initAutozoneInputs: function() {
@@ -280,6 +306,14 @@ function DragAndDropEditBlock(runtime, element, params) {
                                     _fn.build.form.submit();
                                 });
                         });
+                    });
+
+                    // A field's error goes away as soon as the author changes it.
+                    $element.on('input change', '.field-error', function() {
+                        _fn.build.clearFieldError($(this));
+                        if (!$element.find('.field-error').length) {
+                            _fn.build.clearFormError();
+                        }
                     });
 
                     $fbkTab
@@ -523,11 +557,14 @@ function DragAndDropEditBlock(runtime, element, params) {
                                 '.autozone-size-height'
                             ];
                             var success = true;
+                            _fn.build.clearFormError();
                             fields.forEach(function(field) {
                                 var element = _fn.build.$el.zones.tab.find(field);
                                 var val = element.val();
                                 var number = parseInt(element.val(), 10);
                                 // Make sure the user entered a positive integer number.
+                                // Only the outline marks these: they share one row, so a message under each
+                                // would break it. The message by the buttons says what is wrong.
                                 if (number && number > 0 && String(number) === val) {
                                     element.removeClass('field-error');
                                 } else {
@@ -536,10 +573,9 @@ function DragAndDropEditBlock(runtime, element, params) {
                                 }
                             });
                             if (!success) {
-                                runtime.notify('error', {
-                                    'title': gettext("There was an error with your form."),
-                                    'message': gettext("Please check the values you entered.")
-                                });
+                                _fn.build.showFormError(
+                                    gettext("Zone layout and size must be whole numbers greater than 0.")
+                                );
                             }
                             return success;
                         },
@@ -760,17 +796,16 @@ function DragAndDropEditBlock(runtime, element, params) {
                         };
 
                         var handlerUrl = runtime.handlerUrl(element, 'studio_submit');
+                        _fn.build.clearFormError();
                         runtime.notify('save', {state: 'start', message: gettext("Saving")});
                         $.post(handlerUrl, JSON.stringify(data), 'json').done(function(response) {
                             if (response.result === 'success') {
                                 runtime.notify('save', {state: 'end'});
                             } else {
-                                var message = response.messages.join(", ");
-                                runtime.notify('error', {
-                                    'title': gettext("There was an error with your form."),
-                                    'message': message
-                                });
+                                _fn.build.showFormError(response.messages.join(", "));
                             }
+                        }).fail(function() {
+                            _fn.build.showFormError(gettext("The problem could not be saved. Please try again."));
                         });
                     }
                 }

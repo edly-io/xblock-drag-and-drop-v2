@@ -329,9 +329,27 @@
 
 .xblock--drag-and-drop--editor .tab .field-error {
     outline: none;
-    box-shadow: 0 0 10px 0 darkred;
+    border-color: #c32d3a;
+    box-shadow: 0 0 0 1px #c32d3a;
     /* Needed because Safari won't show the box-shadow for textareas otherwise. */
     -webkit-appearance: none;
+}
+
+/* The message under a field that failed validation, and the one by the buttons. */
+.xblock--drag-and-drop--editor .tab .field-error-message {
+    margin: 4px 0 0;
+    color: #c32d3a;
+    font-size: 13px;
+    font-weight: normal;
+}
+
+.xblock--drag-and-drop--editor .form-error {
+    margin: 0 0 8px;
+    padding: 8px 12px;
+    border-left: 4px solid #c32d3a;
+    background-color: #fdeeee;
+    color: #c32d3a;
+    font-size: 14px;
 }
 
 .xblock--drag-and-drop--editor .icon.add:before {
