@@ -345,7 +345,8 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                         'role': 'button',
                         'aria-describedby': zone_description_id,
                     },
-                    style: {
+                    // Auto zones flow in a grid instead (see .auto-zones in the CSS).
+                    style: ctx.auto_zones ? {} : {
                         top: zone.y_percent + '%', left: zone.x_percent + "%",
                         width: zone.width_percent + '%', height: zone.height_percent + "%",
                     }
@@ -846,9 +847,16 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                     instructionsTemplate(ctx),
                     h('div.drag-container', {style: drag_container_style}, [
                         h('div.item-bank', item_bank_properties, bank_children),
-                        h('div.target', {attributes: {'role': 'group', 'arial-label': gettext('Drop Targets')}}, [
+                        // auto-zones: Studio's generated background. Its zones flow in a grid of the author's
+                        // columns and grow to fit their cards, and they draw their own outline.
+                        h(ctx.auto_zones ? 'div.target.auto-zones' : 'div.target',
+                          {attributes: {'role': 'group', 'arial-label': gettext('Drop Targets')}}, [
                             itemFeedbackPopupTemplate(ctx),
-                            h('div.target-img-wrapper', [
+                            h('div.target-img-wrapper', {
+                                style: ctx.auto_zones ? {
+                                    gridTemplateColumns: 'repeat(' + ctx.auto_zones + ', minmax(0, 1fr))'
+                                } : {}
+                            }, [
                                 h('img.target-img', {
                                     src: ctx.target_img_src,
                                     alt: ctx.target_img_description,
@@ -2340,6 +2348,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             show_submit_answer: configuration.mode == DragAndDropBlock.ASSESSMENT_MODE,
             show_show_answer: canShowAnswer(),
             target_img_src: configuration.target_img_expanded_url,
+            auto_zones: configuration.auto_zones,
             target_img_description: configuration.target_img_description,
             display_zone_labels: configuration.display_zone_labels,
             display_zone_borders: configuration.display_zone_borders,

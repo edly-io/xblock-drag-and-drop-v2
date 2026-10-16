@@ -413,6 +413,7 @@ class DragAndDropBlock(
                 item['displayName'] = sanitize_html(item.get('displayName', ''))
             return items
 
+        target_img_url, auto_zones = self._learner_target_img()
         return {
             "block_id": six.text_type(self.scope_ids.usage_id),
             "display_name": sanitize_html(self.display_name),
@@ -436,7 +437,8 @@ class DragAndDropBlock(
             "show_problem_header": self.show_question_header,
             "instructions_title": self.instructions_title,
             "instructions_text": self.instructions_text,
-            "target_img_expanded_url": self.target_img_expanded_url,
+            "target_img_expanded_url": target_img_url,
+            "auto_zones": auto_zones,
             "target_img_description": self.target_img_description,
             "item_background_color": self.item_background_color or None,
             "item_text_color": self.item_text_color or None,
@@ -786,6 +788,25 @@ class DragAndDropBlock(
             return url
         else:
             return self.default_background_image_url
+
+    def _learner_target_img(self):
+        """
+        The target image URL for the learner view, and, when it is the background Studio generates for
+        auto-placed zones, its number of columns (otherwise 0). That background draws each zone as a dashed box;
+        those boxes are removed here, and the learner view lays the zones out in a grid of that many columns
+        instead, each zone growing to fit its cards.
+        """
+        url = self.target_img_expanded_url
+        prefix = "data:image/svg+xml,"
+        if not url.startswith(prefix):
+            return url, 0
+        svg = urllib.parse.unquote(url[len(prefix):])
+        cols = re.search(r'data-cols="(\d+)"', svg)
+        if 'data-producer="dndv2"' not in svg or not cols:
+            return url, 0
+        # Saved as either <rect .../> or <rect ...></rect>, depending on how the editor serialized it.
+        svg = re.sub(r"<rect\b[^>]*stroke-dasharray[^>]*(?:/>|>\s*</rect>)", "", svg)
+        return prefix + urllib.parse.quote(svg, safe=""), max(int(cols.group(1)), 1)
 
     @property
     def target_img_description(self):

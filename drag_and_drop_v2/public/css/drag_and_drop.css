@@ -1040,7 +1040,7 @@
 .xblock--drag-and-drop .option .option-grip,
 .xblock--drag-and-drop .option .option-result-icon,
 .xblock--drag-and-drop .option .option-result-none,
-.xblock--drag-and-drop .zone .zone-hint {
+.xblock--drag-and-drop .drag-container .target .zone p.zone-hint {
     display: none;
 }
 
@@ -1098,4 +1098,37 @@
 .xblock--drag-and-drop .attempt-result .notification-message {
     margin: 0 0 4px;
     font-weight: bold;
+}
+
+/* Zones on Studio's generated background flow in a grid of the author's columns (set inline by the JS), grow to fit
+   their cards and draw their own box. The background is blank once the server removes its dashed boxes, so it is
+   hidden. On a phone the grid is one column. */
+.xblock--drag-and-drop .target.auto-zones {
+    display: block;
+    width: 100%;
+}
+
+.xblock--drag-and-drop .target.auto-zones .target-img-wrapper {
+    display: grid;
+    gap: 16px;
+}
+
+.xblock--drag-and-drop .target.auto-zones .target-img {
+    display: none;
+}
+
+/* Relative, not static: the zone's labels are absolutely positioned inside it. */
+.xblock--drag-and-drop .target.auto-zones .zone {
+    position: relative;
+    box-sizing: border-box;
+    min-height: 120px;
+    border: 2px solid #d6d6d6;
+    border-radius: 10px;
+    background-color: #f7f7f7;
+}
+
+@media screen and (max-width: 480px) {
+    .xblock--drag-and-drop .target.auto-zones .target-img-wrapper {
+        grid-template-columns: minmax(0, 1fr) !important; /* beats the author's columns, set inline */
+    }
 }
