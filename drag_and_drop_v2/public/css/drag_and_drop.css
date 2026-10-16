@@ -1024,7 +1024,7 @@
 
 /*** RESPONSIVE: GROUP D END ***/
 
-/* An empty bank collapses. During a keyboard grab one that is still a drop target opens to one card high. */
+/* An empty bank collapses. While a placed decoy is grabbed with the keyboard it opens to one card high. */
 .xblock--drag-and-drop .item-bank:empty {
     border: 0;
 }

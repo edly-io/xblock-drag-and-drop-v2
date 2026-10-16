@@ -399,6 +399,8 @@ class DragAndDropBlock(
             items = copy.deepcopy(self.data.get('items', ''))
             for item in items:
                 del item['feedback']
+                # A decoy (an item with no zone) is the only kind that can go back to the bank once placed.
+                item['decoy'] = not self.get_item_zones(item['id'])
                 # Use item.pop to remove both `item['zone']` and `item['zones']`; we don't have
                 # a guarantee that either will be present, so we can't use `del`. Legacy instances
                 # will have `item['zone']`, while current versions will have `item['zones']`.
@@ -986,11 +988,17 @@ class DragAndDropBlock(
         item = self._get_item_definition(item_attempt['val'])
 
         is_correct = self._is_attempt_correct(item_attempt)  # Student placed item in a correct zone
-        if is_correct:  # In standard mode state is only updated when attempt is correct
+        if item_attempt['zone'] is None:
+            self.item_state.pop(str(item['id']), None)
+        else:
+            # A wrong item stays in its zone, marked Incorrect, until the learner moves it to another zone.
             self.item_state[str(item['id'])] = self._make_state_from_attempt(item_attempt, is_correct)
 
         self._mark_complete_and_publish_grade()  # must happen before _get_feedback
-        self._publish_item_dropped_event(item_attempt, is_correct)
+        if item_attempt['zone'] is None:
+            self._publish_item_to_bank_event(item['id'], is_correct)
+        else:
+            self._publish_item_dropped_event(item_attempt, is_correct)
 
         item_feedback_key = 'correct' if is_correct else 'incorrect'
         item_feedback = FeedbackMessage(self._expand_static_url(item['feedback'][item_feedback_key]), None)
@@ -1026,13 +1034,14 @@ class DragAndDropBlock(
 
     def _validate_drop_item(self, item):
         """
-        Validates `drop_item` parameters. Assessment mode allows returning
-        items to the bank, so validation is unnecessary.
+        Validates `drop_item` parameters. A placed item can move to another zone, but only a decoy (an item
+        with no zone) can go back to the bank (zone None).
         """
-        if self.mode != Constants.ASSESSMENT_MODE:
-            zone = self._get_zone_by_uid(item['zone'])
-            if not zone:
-                raise JsonHandlerError(400, "Item zone data invalid.")
+        if item['zone'] is None and not self.get_item_zones(item['val']):
+            return
+        zone = self._get_zone_by_uid(item['zone'])
+        if not zone:
+            raise JsonHandlerError(400, "Item zone data invalid.")
 
     @staticmethod
     def _make_state_from_attempt(attempt, correct):
@@ -1103,7 +1112,7 @@ class DragAndDropBlock(
 
     def _publish_item_to_bank_event(self, item_id, is_correct):
         """
-        Publishes event when item moved back to the bank in assessment mode.
+        Publishes event when a decoy item is moved back to the bank.
         """
         item = self._get_item_definition(item_id)
 
@@ -1133,7 +1142,7 @@ class DragAndDropBlock(
         Check if the item was placed correctly.
         """
         correct_zones = self.get_item_zones(attempt['val'])
-        if correct_zones == [] and attempt['zone'] is None and self.mode == Constants.ASSESSMENT_MODE:
+        if correct_zones == [] and attempt['zone'] is None:
             return True
         return attempt['zone'] in correct_zones
 
