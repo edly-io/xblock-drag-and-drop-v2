@@ -226,6 +226,7 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
         self.assertEqual(weighted_grade, expected_earned_score)
 
     def test_ajax_solve_and_reset(self):
+        self.block.mode = Constants.STANDARD_MODE
         # Check assumptions / initial conditions:
         self.assertFalse(self.block.completed)
         self.assertEqual(self.block.raw_possible, 1)
@@ -287,6 +288,7 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
         The form of items stored in user item_state has changed several times.
         This test makes sure that legacy forms are properly converted to compatible format.
         """
+        self.block.mode = Constants.STANDARD_MODE
         self.assertEqual(self.block.item_state, {})
         self.assertEqual(self.call_handler('student_view_user_state')['items'], {})
 

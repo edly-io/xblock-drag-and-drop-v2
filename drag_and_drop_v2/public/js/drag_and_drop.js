@@ -369,30 +369,6 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         );
     };
 
-    var feedbackTemplate = function(ctx) {
-        var messages = ctx.overall_feedback_messages || [];
-        var feedback_display = messages.length > 0 ? 'block' : 'none';
-        var feedback_messages = messages.map(function(message) {
-            var selector = "p.message";
-            if (message.message_class) {
-                selector += "."+message.message_class;
-            }
-            return h(selector, {innerHTML: gettext(message.message)}, []);
-        });
-
-        return (
-            h('div.feedback', {
-                attributes: {'role': 'group', 'aria-label': gettext('Feedback'), 'aria-live': 'polite'},
-                style: { display: feedback_display }
-            }, [
-                h('div.feedback-content',[
-                    h('h3.title1', gettext('Feedback')),
-                    h('div.messages', gettext(feedback_messages)),
-                ])
-            ])
-        );
-    };
-
     // The author's instructions (a short title and one line), in a panel between the problem text and the
     // items.
     var instructionsTemplate = function(ctx) {
@@ -405,14 +381,14 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         ]);
     };
 
-    // "1 of 3 cards placed", under the zones. Not while the answer is shown, which places every item.
+    // "1 of 3 actions matched", under the zones. Not while the answer is shown, which places every item.
     var placedCountTemplate = function(ctx) {
         if (ctx.showing_answer || !ctx.items.length) {
             return null;
         }
         var template = ngettext(
-            '{placed} of {total} card placed',
-            '{placed} of {total} cards placed',
+            '{placed} of {total} action matched',
+            '{placed} of {total} actions matched',
             ctx.items.length
         );
         var text = template.replace('{placed}', ctx.placed_count).replace('{total}', ctx.items.length);
@@ -554,19 +530,6 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
     };
 
     var sidebarTemplate = function(ctx) {
-        var showAnswerButton = null;
-        if (ctx.show_show_answer) {
-            var options = {
-                disabled: !!ctx.showing_answer,
-                spinner: ctx.show_answer_spinner
-            };
-            showAnswerButton = sidebarButtonTemplate(
-                "show",
-                "fa-info-circle",
-                gettext('Show Answer'),
-                options
-            );
-        }
         var go_to_beginning_button_class = 'go-to-beginning-button';
         if (!ctx.show_go_to_beginning_button) {
             go_to_beginning_button_class += ' sr';
@@ -579,13 +542,6 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                     gettext("Go to Beginning"),
                     {disabled: ctx.disable_go_to_beginning_button}
                 ),
-                sidebarButtonTemplate(
-                    "reset",
-                    "fa-refresh",
-                    gettext('Reset'),
-                    {disabled: ctx.disable_reset_button}
-                ),
-                showAnswerButton,
             ])
         )
     };
@@ -772,7 +728,6 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         } else {
             main_element_properties.attributes['aria-label'] = gettext('Drag and Drop Problem');
         }
-        var problemHeader = ctx.show_problem_header ? h('h4.title1', gettext('Problem')) : null;
         // Render only items in the bank here, including placeholders.  Placed
         // items will be rendered by zoneTemplate.
         var items_in_bank = [];
@@ -834,7 +789,6 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                 gettext(problemProgress),
                 h('div', [forwardKeyboardHelpButtonTemplate(ctx)]),
                 h('div.problem', [
-                    problemHeader,
                     h('p', {innerHTML: ctx.problem_html}),
                     instructionsTemplate(ctx),
                     h('div.drag-container', {style: drag_container_style}, [
@@ -867,7 +821,6 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                         sidebarTemplate(ctx)
                     ]),
                     keyboardHelpPopupTemplate(ctx),
-                    feedbackTemplate(ctx),
                     h('div.sr.reader-feedback-area', {
                         attributes: {'aria-live': 'polite', 'aria-atomic': true},
                         innerHTML: ctx.screen_reader_messages
@@ -971,14 +924,6 @@ function DragAndDropBlock(runtime, element, configuration) {
             $element.on('click', '.keyboard-help-button', showKeyboardHelp);
             $element.on('keydown', '.keyboard-help-button', function(evt) {
                 runOnKey(evt, RET, showKeyboardHelp);
-            });
-            $element.on('click', '.xblock--drag-and-drop .problem-action-button-wrapper .reset', resetProblem);
-            $element.on('keydown', '.xblock--drag-and-drop .problem-action-button-wrapper .reset', function(evt) {
-                runOnKey(evt, RET, resetProblem);
-            });
-            $element.on('click', '.xblock--drag-and-drop .problem-action-button-wrapper .show', showAnswer);
-            $element.on('keydown', '.xblock--drag-and-drop .problem-action-button-wrapper .show', function(evt) {
-                runOnKey(evt, RET, showAnswer);
             });
 
             // We need to register both mousedown and click event handlers because in some browsers the blur
@@ -1173,16 +1118,6 @@ function DragAndDropBlock(runtime, element, configuration) {
     var focusModalButton = function() {
         $root.find('.keyboard-help-dialog .modal-dismiss-button').focus();
     };
-
-    var focusSuccessFeedback = function() {
-        var $feedback = $element.find('.final');
-        if ($feedback.is(':visible')) {
-            $feedback.attr('tabindex', '-1');
-            $feedback.focus();
-            return true;
-        };
-        return false;
-    }
 
     var showKeyboardHelp = function(evt) {
         var focusId = document.activeElement;
@@ -2036,7 +1971,7 @@ function DragAndDropBlock(runtime, element, configuration) {
         applyState();
 
         if (manually_closed) {
-            focusSuccessFeedback() || focusFirstDraggable();
+            focusFirstDraggable();
         }
     };
 
@@ -2047,42 +1982,6 @@ function DragAndDropBlock(runtime, element, configuration) {
             previousFeedback = state.feedback;
             state.manually_closed = manually_closed;
         }
-    };
-
-    var resetProblem = function(evt) {
-        evt.preventDefault();
-        $.ajax({
-            type: 'POST',
-            url: runtime.handlerUrl(element, 'reset'),
-            data: '{}',
-        }).done(function(data) {
-            state = data;
-            applyState();
-            focusFirstDraggable();
-        });
-    };
-
-    var showAnswer = function(evt) {
-        evt.preventDefault();
-        state.show_answer_spinner = true;
-        applyState();
-
-        $.ajax({
-            type: 'POST',
-            url: runtime.handlerUrl(element, 'show_answer'),
-            data: '{}',
-        }).done(function(data) {
-            state.items = data.items;
-            state.showing_answer = true;
-            state.explanation = data.explanation;
-            delete state.feedback;
-        }).always(function() {
-            state.show_answer_spinner = false;
-            applyState();
-            // With no decoys the bank is empty and collapsed, so focus the first zone instead.
-            var $bank = $root.find('.item-bank');
-            ($bank.find('.option').length ? $bank : $root.find('.target .zone').first()).focus();
-        });
     };
 
     // After an assessment attempt, marks every placed item correct unless the server reported it as
@@ -2128,7 +2027,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             if (showTryAgain()) {
                 focusSubmitButton();
             } else {
-                focusItemFeedbackPopup() || focusSuccessFeedback() || focusFirstDraggable();
+                focusItemFeedbackPopup() || focusFirstDraggable();
             }
         });
     };
@@ -2156,22 +2055,6 @@ function DragAndDropBlock(runtime, element, configuration) {
         });
     };
 
-    var canReset = function() {
-        var any_items_placed = false;
-        // Now set any_items_placed to true if any items have been successfully placed on the board.
-        // Exclude just-dropped items that are making an AJAX call to the server, or else screen readers
-        // will read out "Reset problem" instead of the contents of the correct popup.
-        for (var key in state.items) {
-            if (state.items.hasOwnProperty(key)) {
-                if (!state.items[key].submitting_location) {
-                    any_items_placed = true;
-                    break;
-                }
-            }
-        }
-        return any_items_placed && (configuration.mode !== DragAndDropBlock.ASSESSMENT_MODE || attemptsRemain());
-    };
-
     var isPastDue = function () {
         return configuration.has_deadline_passed;
     };
@@ -2180,11 +2063,6 @@ function DragAndDropBlock(runtime, element, configuration) {
     var attemptsRemain = function() {
         return !configuration.max_attempts || configuration.max_attempts > state.attempts;
     };
-    var canShowAnswer = function() {
-        if(state.answer_available === undefined) return configuration.answer_available;
-        return state.answer_available;
-    }
-
     var submittingLocation = function() {
         var result = false;
         Object.keys(state.items).forEach(function(item_id) {
@@ -2280,7 +2158,6 @@ function DragAndDropBlock(runtime, element, configuration) {
             instructions_title: configuration.instructions_title,
             instructions_text: configuration.instructions_text,
             show_submit_answer: configuration.mode == DragAndDropBlock.ASSESSMENT_MODE,
-            show_show_answer: canShowAnswer(),
             target_img_src: configuration.target_img_expanded_url,
             auto_zones: configuration.auto_zones,
             target_img_description: configuration.target_img_description,
@@ -2296,9 +2173,7 @@ function DragAndDropBlock(runtime, element, configuration) {
             item_bank_focusable: item_bank_focusable,
             can_return_to_bank: can_return_to_bank,
             feedback_messages: state.feedback,
-            overall_feedback_messages: state.overall_feedback,
             explanation: state.explanation,
-            disable_reset_button: !canReset(),
             disable_submit_button: !canSubmitAttempt(),
             submit_spinner: state.submit_spinner,
             showing_answer: state.showing_answer,
@@ -2307,7 +2182,6 @@ function DragAndDropBlock(runtime, element, configuration) {
             placed_count: placedCount(),
             show_try_again: showTryAgain(),
             finished: Boolean(state.finished),
-            show_answer_spinner: state.show_answer_spinner,
             disable_go_to_beginning_button: !canGoToBeginning(),
             show_go_to_beginning_button: state.go_to_beginning_button_visible,
             screen_reader_messages: (state.screen_reader_messages || '')
