@@ -97,14 +97,22 @@
                     </div>
 
                     <label class="h4">
-                        <span>{% trans "Introductory feedback" %}</span>
-                        <textarea class="intro-feedback">{% trans self.data.feedback.start %}</textarea>
+                        <span>{% trans "Introductory feedback (screen readers only)" %}</span>
+                        <textarea class="intro-feedback"
+                                  aria-describedby="intro-feedback-description-{{id_suffix}}">{% trans self.data.feedback.start %}</textarea>
                     </label>
+                    <div id="intro-feedback-description-{{id_suffix}}" class="form-help">
+                      {% trans "Read to screen reader users when the problem loads. It is not shown on screen." %}
+                    </div>
 
                     <label class="h4">
-                        <span>{% trans "Final feedback" %}</span>
-                        <textarea class="final-feedback">{% trans self.data.feedback.finish %}</textarea>
+                        <span>{% trans "Final feedback (screen readers only)" %}</span>
+                        <textarea class="final-feedback"
+                                  aria-describedby="final-feedback-description-{{id_suffix}}">{% trans self.data.feedback.finish %}</textarea>
                     </label>
+                    <div id="final-feedback-description-{{id_suffix}}" class="form-help">
+                      {% trans "Read to screen reader users when the problem is finished. It is not shown on screen." %}
+                    </div>
 
                     <label class="h4">
                         <span>{% trans "Explanation Text" %}</span>

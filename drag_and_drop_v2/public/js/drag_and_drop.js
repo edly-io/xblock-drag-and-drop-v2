@@ -174,8 +174,7 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
             var description_content;
             if (item.result === 'incorrect') {
                 description_content = gettext('Incorrectly placed in: {zone_title}').replace('{zone_title}', zone_title);
-            } else if (item.result !== 'correct' &&
-                       configuration.mode === DragAndDropBlock.ASSESSMENT_MODE && !ctx.showing_answer) {
+            } else if (item.result !== 'correct' && configuration.mode === DragAndDropBlock.ASSESSMENT_MODE) {
                 // In assessment mode placed items will "stick" even when not in correct zone.
                 description_content = gettext('Placed in: {zone_title}').replace('{zone_title}', zone_title);
             } else {
@@ -307,7 +306,7 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         // Decoration for the Uber theme (the block's CSS hides it). Screen readers get the zone
         // and item descriptions instead.
         var zone_hint = null;
-        if (ctx.display_zone_labels && !ctx.showing_answer) {
+        if (ctx.display_zone_labels) {
             zone_hint = h('p.zone-hint', {attributes: {'aria-hidden': 'true'}}, [
                 h('span.zone-hint-state', zoneHintText(zone_state, ctx)),
                 ctx.finished ? null : h('span.zone-hint-target', gettext('Drop it here'))
@@ -381,9 +380,9 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         ]);
     };
 
-    // "1 of 3 actions matched", under the zones. Not while the answer is shown, which places every item.
+    // "1 of 3 actions matched", under the zones.
     var placedCountTemplate = function(ctx) {
-        if (ctx.showing_answer || !ctx.items.length) {
+        if (!ctx.items.length) {
             return null;
         }
         var template = ngettext(
@@ -397,10 +396,9 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
 
     // The "Correct" / "Not quite" card after an assessment attempt. Its body is the author's explanation once
     // the Show Answer setting allows it (the server leaves it out until then), otherwise a short line.
-    // Hidden while the answer is shown, which shows the explanation itself.
     var attemptResultTemplate = function(ctx) {
         var result = ctx.attempt_result;
-        if (!result || ctx.showing_answer) {
+        if (!result) {
             return null;
         }
         var body = null;
@@ -416,23 +414,6 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
             h('p.notification-message', result.correct ? gettext('Correct') : gettext('Not quite')),
             body
         ]);
-    };
-
-    var explanationTemplate = function (ctx) {
-        var explanation_display = ctx.explanation ? 'block' : 'none';
-        return (
-            h('.solution-span', {
-                attributes: {'aria-label': gettext('Explanation')},
-                style: {display: explanation_display}
-            }, [
-                h('span', [
-                    h('.detailed-solution', [
-                        h('p', gettext('Explanation')),
-                        h('p', {innerHTML: gettext(ctx.explanation)}),
-                    ])
-                ])
-            ])
-        );
     };
 
     var keyboardHelpPopupTemplate = function(ctx) {
@@ -815,7 +796,6 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
                     ]),
                     placedCountTemplate(ctx),
                     attemptResultTemplate(ctx),
-                    explanationTemplate(ctx),
                     h('div.action', [
                         (ctx.show_submit_answer ? submitAnswerTemplate(ctx) : null),
                         sidebarTemplate(ctx)
@@ -2072,10 +2052,9 @@ function DragAndDropBlock(runtime, element, configuration) {
         return result;
     }
 
-    // The result mark a placed item shows: 'correct', 'incorrect', or null for no mark. There are no
-    // marks while Show Answer is on, because the answer state marks every item correct.
+    // The result mark a placed item shows: 'correct', 'incorrect', or null for no mark.
     var itemResult = function(item_user_state) {
-        if (!item_user_state || state.showing_answer) {
+        if (!item_user_state) {
             return null;
         }
         if (item_user_state.correct === true) {
@@ -2140,8 +2119,6 @@ function DragAndDropBlock(runtime, element, configuration) {
 
         // While a placed decoy is grabbed the bank is a drop target, so it must be able to gain focus.
         var can_return_to_bank = state.keyboard_placement_mode && canReturnGrabbedToBank();
-        var item_bank_focusable = can_return_to_bank ||
-            (state.showing_answer && configuration.mode === DragAndDropBlock.ASSESSMENT_MODE);
 
         var context = {
             drag_container_max_width: containerMaxWidth,
@@ -2170,13 +2147,11 @@ function DragAndDropBlock(runtime, element, configuration) {
             attempts: state.attempts,
             grade: state.grade,
             last_action_correct: state.last_action_correct,
-            item_bank_focusable: item_bank_focusable,
+            item_bank_focusable: can_return_to_bank,
             can_return_to_bank: can_return_to_bank,
             feedback_messages: state.feedback,
-            explanation: state.explanation,
             disable_submit_button: !canSubmitAttempt(),
             submit_spinner: state.submit_spinner,
-            showing_answer: state.showing_answer,
             attempt_result: state.attempt_result,
             attempts_remain: attemptsRemain(),
             placed_count: placedCount(),

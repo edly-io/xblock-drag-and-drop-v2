@@ -456,21 +456,6 @@
     text-align: center;
 }
 
-/*** EXPLANATION ***/
-
-.xblock--drag-and-drop .solution-span span {
-    margin: 20px 0;
-    display: block;
-}
-
-.xblock--drag-and-drop .solution-span span .detailed-solution p {
-    margin: 0;
-}
-
-.xblock--drag-and-drop .solution-span span .detailed-solution > p:first-child {
-    font-weight: 600;
-}
-
 .xblock--drag-and-drop .popup {
     position: absolute;
     top: 5%;

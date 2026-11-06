@@ -95,9 +95,10 @@ and Drop component to a lesson, then click the `EDIT` button.
 
 In the first step, you can set some basic properties of the component, such as
 the title, the problem mode, the maximum number of attempts, the maximum score,
-the problem text to render above the background image, the introductory feedback
-(shown initially), and the final feedback (shown after the learner successfully
-completes the drag and drop problem, or when the learner runs out of attempts).
+the lead text to render under the title, the introductory feedback
+(read to screen reader users initially), and the final feedback (read to screen
+reader users after the learner successfully completes the drag and drop problem,
+or when the learner runs out of attempts). Neither feedback is shown on screen.
 
 There are two problem modes available:
 
@@ -106,9 +107,10 @@ There are two problem modes available:
 * **Assessment**: In this mode, the learner places all items on the board and
   then clicks a "Submit" button to get feedback.
   * The number of attempts can be limited.
-  * The learner can click a "Show Answer" button to temporarily place items on their correct drop zones.    
-    You can select one of the pre-defined conditions for displaying this button. They work in the same way as in the
-    Problem XBlock, so you can read about each them in the [Problem Component documentation][capa-show-answer].  
+  * The "Show Answer" setting controls when the explanation appears in the result card shown after
+    a submission. There is no "Show Answer" button. You can select one of the pre-defined conditions; they work
+    in the same way as in the Problem XBlock, so you can read about each them in the
+    [Problem Component documentation][capa-show-answer].
     By default, the value from the course "Advanced Settings" configuration is used. If you have modified this for
     a specific XBlock but want to switch back to using the default value, select the "Default" option.
 

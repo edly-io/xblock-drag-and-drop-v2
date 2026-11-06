@@ -85,22 +85,29 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
             "display_name": "Drag and Drop",
             "type": "drag-and-drop-v2",
             "weight": 1,
-            "mode": Constants.STANDARD_MODE,
+            "mode": Constants.ASSESSMENT_MODE,
             "max_attempts": None,
             "graded": False,
             "weighted_max_score": 1,
             "display_zone_borders": False,
             "display_zone_borders_dragging": False,
-            "display_zone_labels": False,
+            "display_zone_labels": True,
             "title": "Drag and Drop",
             "show_title": True,
             "problem_text": "",
             "max_items_per_zone": None,
             "answer_available": False,
-            "show_problem_header": True,
-            "instructions_title": "Match each card",
-            "instructions_text": "Drag each card to the zone it belongs in.",
-            "target_img_expanded_url": '/expanded/url/to/drag_and_drop_v2/public/img/triangle.png',
+            "show_problem_header": False,
+            "instructions_title": "",
+            "instructions_text": "",
+            # The default background Studio generates, without the dashed zone outlines.
+            "target_img_expanded_url": "data:image/svg+xml," + quote(
+                '<svg xmlns="http://www.w3.org/2000/svg" width="390" height="440" data-producer="dndv2" '
+                'data-cols="1" data-rows="3" data-zone_width="350" data-zone_height="120">'
+                '<rect x="0" y="0" width="100%" height="100%" fill="#fff" /></svg>',
+                safe="",
+            ),
+            "auto_zones": 1,
             "target_img_description": TARGET_IMG_DESCRIPTION,
             "item_background_color": None,
             "item_text_color": None,
@@ -110,7 +117,7 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
         self.assertEqual(zones, DEFAULT_DATA["zones"])
         # Items should contain no answer data:
         self.assertEqual(items, [
-            {"id": i, "displayName": display_name, "imageURL": "", "expandedImageURL": ""}
+            {"id": i, "displayName": display_name, "imageURL": "", "expandedImageURL": "", "decoy": i == 4}
             for i, display_name in enumerate(
                 [
                     "Goes to the top",
@@ -331,6 +338,16 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
         self.assertEqual(self.block.max_items_per_zone, None)
         self.assertEqual(self.block.data, {'foo': 1, 'items': []})
 
+    def test_studio_submit_without_show_problem_header(self):
+        """ Studio no longer sends `show_problem_header`; a save keeps the stored value. """
+        self.block.show_question_header = True
+
+        body = self._make_submission(lambda submission: submission.pop('show_problem_header'))
+        res = self.call_handler('studio_submit', body)
+        self.assertEqual(res, {'result': 'success'})
+
+        self.assertEqual(self.block.show_question_header, True)
+
     def test_studio_submit_assessment(self):
         def modify_submission(submission):
             submission.update({
@@ -387,7 +404,9 @@ class BasicTests(TestCaseMixin, unittest.TestCase):
 
     def test_image_url(self):
         """ Ensure that the default image and custom URLs are both expanded by the runtime """
-        self.assertEqual(self.block.data.get("targetImg"), None)
+        self.assertTrue(self.block.student_view_data()["target_img_expanded_url"].startswith("data:image/svg+xml,"))
+
+        del self.block.data["targetImg"]
         self.assertEqual(
             self.block.student_view_data()["target_img_expanded_url"],
             '/expanded/url/to/drag_and_drop_v2/public/img/triangle.png',
