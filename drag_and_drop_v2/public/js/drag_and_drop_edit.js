@@ -787,7 +787,6 @@ function DragAndDropEditBlock(runtime, element, params) {
                             'show_title': $element.find('.show-title').is(':checked'),
                             'weight': $element.find('.weight').val(),
                             'problem_text': $element.find('.problem-text').val(),
-                            'show_problem_header': $element.find('.show-problem-header').is(':checked'),
                             'instructions_title': $element.find('.instructions-title').val(),
                             'instructions_text': $element.find('.instructions-text').val(),
                             'item_background_color': $element.find('.item-background-color').val(),

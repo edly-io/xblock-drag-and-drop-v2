@@ -771,22 +771,22 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self.assertEqual(self.block.raw_earned, expected_score)
 
     def test_move_item_back_to_bank(self):
+        """ Once placed, only a decoy can go back to the bank. """
         self.assertFalse(self.block.completed)  # precondition check
-        expected_score = 3.0 / 5.0
         self._submit_solution({
             0: self.ZONE_1,
             1: self.ZONE_2,
             2: self.ZONE_2,
             3: self.ZONE_1,
         })  # would get a 0.8 score
-        self._submit_solution({
-            0: None,
-            1: self.ZONE_2,
-            2: self.ZONE_2,
-            3: self.ZONE_1,
-        })  # will get a 0.6 score
+
+        res = self.call_handler(self.DROP_ITEM_HANDLER, self._make_submission(0, None), expect_json=False)
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(self.block.item_state['0']['zone'], self.ZONE_1)
+
+        self._submit_solution({3: None})  # the decoy goes back to the bank: 1.0 score
         self._do_attempt()
-        self.assertEqual(self.block.raw_earned, expected_score)
+        self.assertEqual(self.block.raw_earned, 1.0)
 
     def test_do_attempt_zero_score_with_all_decoys(self):
         published_grades = []
