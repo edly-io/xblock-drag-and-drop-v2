@@ -66,9 +66,9 @@ class StandardModeFixture(BaseDragAndDropAjaxFixture):
         res = self.call_handler(self.DROP_ITEM_HANDLER, data)
         item_feedback_message = self._make_item_feedback_message(item_id)
         expected_feedback = [item_feedback_message] if item_feedback_message else []
-        # the item was dropped into wrong zone, but we have two items that were correctly left in the bank,
-        # so the raw score is 2 / 4.0.
-        expected_grade = self.block.weight * 2 / 4.0
+        # The decoy was dropped into a zone and stays there, marked incorrect. The other decoy was correctly
+        # left in the bank, so the raw score is 1 / 4.0.
+        expected_grade = self.block.weight * 1 / 4.0
 
         self.assertEqual(res, {
             "overall_feedback": [

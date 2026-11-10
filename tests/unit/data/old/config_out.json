@@ -11,10 +11,11 @@
     "show_title": true,
     "answer_available": false,
     "problem_text": "",
-    "show_problem_header": true,
-    "instructions_title": "Match each card",
-    "instructions_text": "Drag each card to the zone it belongs in.",
+    "show_problem_header": false,
+    "instructions_title": "",
+    "instructions_text": "",
     "target_img_expanded_url": "http://i0.kym-cdn.com/photos/images/newsfeed/000/030/404/1260585284155.png",
+    "auto_zones": 0,
     "target_img_description": "This describes the target image",
     "item_background_color": null,
     "item_text_color": null,
@@ -51,6 +52,7 @@
           "displayName": "1",
           "imageURL": "",
           "expandedImageURL": "",
+          "decoy": false,
           "id": 0,
           "size": {"height": "auto", "width": "190px"}
         },
@@ -58,6 +60,7 @@
           "displayName": "2",
           "imageURL": "",
           "expandedImageURL": "",
+          "decoy": false,
           "id": 1,
           "size": {"height": "auto", "width": "190px"}
         },
@@ -65,6 +68,7 @@
           "displayName": "X",
           "imageURL": "",
           "expandedImageURL": "",
+          "decoy": true,
           "id": 2,
           "size": {"height": "100px", "width": "100px"}
         },
@@ -72,6 +76,7 @@
           "displayName": "",
           "imageURL": "http://i1.kym-cdn.com/entries/icons/square/000/006/151/tumblr_lltzgnHi5F1qzib3wo1_400.jpg",
           "expandedImageURL": "http://i1.kym-cdn.com/entries/icons/square/000/006/151/tumblr_lltzgnHi5F1qzib3wo1_400.jpg",
+          "decoy": true,
           "id": 3,
           "size": {"height": "auto", "width": "190px"}
         }
