@@ -99,7 +99,7 @@ class DragAndDropBlock(
             {"display_name": _("Standard"), "value": Constants.STANDARD_MODE},
             {"display_name": _("Assessment"), "value": Constants.ASSESSMENT_MODE},
         ],
-        default=Constants.STANDARD_MODE,
+        default=Constants.ASSESSMENT_MODE,
         enforce_type=True,
     )
 
@@ -123,8 +123,9 @@ class DragAndDropBlock(
     )
 
     question_text = String(
-        display_name=_("Problem text"),
-        help=_("The description of the problem or instructions shown to the learner."),
+        display_name=_("Lead text"),
+        help=_("One or two lines under the title telling learners what to do, e.g. "
+               "\"Place each action under the bystander approach it shows.\""),
         scope=Scope.settings,
         default="",
         enforce_type=True,
@@ -132,9 +133,9 @@ class DragAndDropBlock(
 
     show_question_header = Boolean(
         display_name=_('Show "Problem" heading'),
-        help=_('Display the heading "Problem" above the problem text?'),
+        help=_('Display the heading "Problem" above the lead text?'),
         scope=Scope.settings,
-        default=True,
+        default=False,
         enforce_type=True,
     )
 
@@ -143,7 +144,7 @@ class DragAndDropBlock(
         help=_("A short heading for the instructions panel above the items, e.g. \"Match each action\". "
                "Leave both instructions fields empty to hide the panel."),
         scope=Scope.settings,
-        default=_("Match each card"),
+        default="",
         enforce_type=True,
     )
 
@@ -151,7 +152,7 @@ class DragAndDropBlock(
         display_name=_("Instructions text"),
         help=_("One line under the instructions title telling learners how to answer."),
         scope=Scope.settings,
-        default=_("Drag each card to the zone it belongs in."),
+        default="",
         enforce_type=True,
     )
     showanswer = String(
@@ -525,7 +526,7 @@ class DragAndDropBlock(
             del self.showanswer
         self.show_title = submissions['show_title']
         self.question_text = submissions['problem_text']
-        self.show_question_header = submissions['show_problem_header']
+        self.show_question_header = submissions.get('show_problem_header', self.show_question_header)
         self.instructions_title = submissions.get('instructions_title', self.instructions_title)
         self.instructions_text = submissions.get('instructions_text', self.instructions_text)
         self.weight = float(submissions['weight'])
