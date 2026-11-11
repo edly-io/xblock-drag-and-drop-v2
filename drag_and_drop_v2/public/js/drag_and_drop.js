@@ -303,6 +303,10 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         var items_in_zone = $.grep(ctx.items, is_item_in_zone);
         var zone_state = zoneState(items_in_zone);
         selector += '.zone-' + zone_state;
+        // Lets the theme light up every zone while a card is grabbed (mouse, touch or keyboard).
+        if (ctx.items.some(function(i) { return i.grabbed; })) {
+            selector += '.is-drop-available';
+        }
         // Decoration for the Uber theme (the block's CSS hides it). Screen readers get the zone
         // and item descriptions instead.
         var zone_hint = null;
@@ -858,6 +862,12 @@ function DragAndDropBlock(runtime, element, configuration) {
     var MAX_LENGTH = 255;
 
     var DEFAULT_ZONE_ALIGN = 'center';
+
+    // Motion tokens shared with the Uber theme.
+    var MOTION = {
+        slow: 320,
+        move: 'cubic-bezier(0.4, 0, 0.2, 1)'
+    };
 
     // Number of miliseconds the user has to keep their finger on the item
     // without moving for drag to begin.
@@ -1434,6 +1444,7 @@ function DragAndDropBlock(runtime, element, configuration) {
     };
 
     var clearAttemptResult = function() {
+        $root.removeClass('is-just-checked');
         if (!state.attempt_result) {
             return;
         }
@@ -1441,6 +1452,14 @@ function DragAndDropBlock(runtime, element, configuration) {
         Object.keys(state.items).forEach(function(item_id) {
             delete state.items[item_id].correct;
         });
+    };
+
+    // One-shot class for the theme's wrong-answer shake. It is never in the server-rendered markup, so a reload
+    // doesn't replay it; the next grab or change of answer removes it.
+    var flagJustChecked = function() {
+        $root.removeClass('is-just-checked');
+        void root.offsetWidth;  // restart the animation on a second wrong check
+        $root.addClass('is-just-checked');
     };
 
     var placeGrabbedItem = function($zone) {
@@ -1472,6 +1491,10 @@ function DragAndDropBlock(runtime, element, configuration) {
             return;
         }
 
+        // FLIP: where the card is now (the dragged copy, or its bank / zone spot for a keyboard grab).
+        var from_el = $root.find('.option[aria-grabbed="true"]')[0];
+        var first = from_el ? from_el.getBoundingClientRect() : null;
+
         state.items[item_id] = {
             zone: zone,
             zone_align: zone_align,
@@ -1480,7 +1503,31 @@ function DragAndDropBlock(runtime, element, configuration) {
         clearAttemptResult();  // the answer has changed since the last attempt
 
         applyState();
+        glideToZone(item_id, first);
         submitLocation(item_id, zone);
+    };
+
+    // Glides the card from where it was dropped to its place in the zone. Runs on the next frame, after the
+    // caller has released the grab and the card has its final size. The animation leaves no inline styles.
+    var glideToZone = function(item_id, first) {
+        if (!first) {
+            return;
+        }
+        requestAnimationFrame(function() {
+            var el = $root.find('.zone .option').filter(function() { return $(this).data('value') == item_id; })[0];
+            if (!el || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                return;
+            }
+            var last = el.getBoundingClientRect();
+            var dx = first.left - last.left;
+            var dy = first.top - last.top;
+            if ((dx || dy) && el.animate) {
+                el.animate(
+                    [{transform: 'translate(' + dx + 'px, ' + dy + 'px)'}, {transform: 'none'}],
+                    {duration: MOTION.slow, easing: MOTION.move}
+                );
+            }
+        });
     };
 
     var countItemsInZone = function(zone, exclude_ids) {
@@ -1863,6 +1910,7 @@ function DragAndDropBlock(runtime, element, configuration) {
         $root.find('.drag-container').toggleClass('has-tap-selection', interaction_type === 'tap');
         // Lets the theme show the focused zone as the drop Target during keyboard placement.
         $root.find('.drag-container').toggleClass('has-keyboard-selection', interaction_type === 'keyboard');
+        $root.removeClass('is-just-checked');
         closePopup(false);
         applyState();
     };
@@ -1906,6 +1954,9 @@ function DragAndDropBlock(runtime, element, configuration) {
                     state.feedback = [];
                     state.grade = data.grade;
                     state.items[item_id].correct = Boolean(data.correct);
+                    if (!data.correct) {
+                        flagJustChecked();
+                    }
                     if (data.finished) {
                         state.finished = true;
                         state.overall_feedback = data.overall_feedback;
@@ -1997,6 +2048,9 @@ function DragAndDropBlock(runtime, element, configuration) {
             state.last_action_correct = data.correct;
             state.attempt_result = data.attempt_result;
             markAttemptResults(data.misplaced_items);
+            if ((data.misplaced_items || []).length) {
+                flagJustChecked();
+            }
             if (!attemptsRemain()) {
                 state.finished = true;
             }
