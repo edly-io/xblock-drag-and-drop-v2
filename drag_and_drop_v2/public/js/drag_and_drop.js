@@ -303,9 +303,16 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         var items_in_zone = $.grep(ctx.items, is_item_in_zone);
         var zone_state = zoneState(items_in_zone);
         selector += '.zone-' + zone_state;
-        // Lets the theme light up every zone while a card is grabbed (mouse, touch or keyboard).
-        if (ctx.items.some(function(i) { return i.grabbed; })) {
-            selector += '.is-drop-available';
+        // Lets the theme light up the zones that can take the grabbed card (mouse, touch or keyboard). Not its own
+        // zone (a no-op drop), nor a zone already at max_items_per_zone (see placeGrabbedItem).
+        var grabbed_item = $.grep(ctx.items, function(i) { return i.grabbed; })[0];
+        if (grabbed_item) {
+            var in_zone = function(i) { return i.is_placed && i.zone === zone.uid; };
+            var others_in_zone = $.grep(ctx.items, function(i) { return in_zone(i) && !i.grabbed; }).length;
+            var is_full = configuration.max_items_per_zone && others_in_zone >= configuration.max_items_per_zone;
+            if (!in_zone(grabbed_item) && !is_full) {
+                selector += '.is-drop-available';
+            }
         }
         // Decoration for the Uber theme (the block's CSS hides it). Screen readers get the zone
         // and item descriptions instead.
