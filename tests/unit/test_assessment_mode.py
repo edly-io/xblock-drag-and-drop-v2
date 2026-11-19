@@ -709,12 +709,19 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
             ({}, '', ''),
             ({'explanation': 'Legacy'}, 'Legacy', ''),
             ({'correct_feedback': 'Yes', 'incorrect_feedback': 'No', 'explanation': 'Legacy'}, 'Yes', 'No'),
+            ({'correct_feedback': '', 'explanation': 'Legacy'}, '', ''),  # the author cleared it
         ]:
             with self.subTest(data=data):
                 self.block.data = dict(original, **data)
                 html = self.block.studio_view(None).content
-                self.assertIn('>{}</textarea>'.format(expected_correct), html.split('class="correct-feedback"')[1])
-                self.assertIn('>{}</textarea>'.format(expected_incorrect), html.split('class="incorrect-feedback"')[1])
+                self.assertEqual(self._textarea_content(html, 'correct-feedback'), expected_correct)
+                self.assertEqual(self._textarea_content(html, 'incorrect-feedback'), expected_incorrect)
+
+    @staticmethod
+    def _textarea_content(html, css_class):
+        """ Returns the text inside the one <textarea> with this class """
+        after_class = html.split('class="{}"'.format(css_class), 1)[1]
+        return after_class.split('>', 1)[1].split('</textarea>', 1)[0]
 
     def test_do_attempt_feedback_correct(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 2: self.ZONE_2})  # correct solution

@@ -469,7 +469,7 @@ class DragAndDropBlock(
             'showanswer_set': self._field_data.has(self, 'showanswer'),  # If false, we're using an inherited value.
             'self': self,
             # The legacy `explanation` gives the answer away, so it only pre-fills the correct answer feedback.
-            'correct_feedback': self.data.get('correct_feedback') or self.data.get('explanation') or '',
+            'correct_feedback': self.data.get('correct_feedback', self.data.get('explanation')) or '',
             'incorrect_feedback': self.data.get('incorrect_feedback') or '',
         }
 
