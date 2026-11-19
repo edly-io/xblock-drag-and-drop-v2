@@ -694,6 +694,28 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
         self._submit_complete_solution()
         self.assertEqual(self._do_attempt()['attempt_result'], {'correct': True, 'feedback': 'Well done'})
 
+    def test_legacy_explanation_shown_once_answer_available(self):
+        self.block.showanswer = SA.ALWAYS
+        self.block.data['explanation'] = 'Legacy'
+
+        self._submit_incorrect_solution()
+        self.assertEqual(self._do_attempt()['attempt_result'], {'correct': False, 'feedback': 'Legacy'})
+        self.assertNotIn('explanation', self.call_handler(self.SHOW_ANSWER_HANDLER, data={}))
+
+    def test_studio_view_feedback_prefill(self):
+        """ The legacy `explanation` only pre-fills the correct answer feedback, and the editor opens without it """
+        original = dict(self.block.data)
+        for data, expected_correct, expected_incorrect in [
+            ({}, '', ''),
+            ({'explanation': 'Legacy'}, 'Legacy', ''),
+            ({'correct_feedback': 'Yes', 'incorrect_feedback': 'No', 'explanation': 'Legacy'}, 'Yes', 'No'),
+        ]:
+            with self.subTest(data=data):
+                self.block.data = dict(original, **data)
+                html = self.block.studio_view(None).content
+                self.assertIn('>{}</textarea>'.format(expected_correct), html.split('class="correct-feedback"')[1])
+                self.assertIn('>{}</textarea>'.format(expected_incorrect), html.split('class="incorrect-feedback"')[1])
+
     def test_do_attempt_feedback_correct(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 2: self.ZONE_2})  # correct solution
         res = self._do_attempt()

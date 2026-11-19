@@ -114,15 +114,23 @@
                       {% trans "Read to screen reader users when the problem is finished. It is not shown on screen." %}
                     </div>
 
-                    <label class="h4">
+                    <label class="h4 assessment-setting">
                         <span>{% trans "Correct answer feedback" %}</span>
-                        <textarea class="correct-feedback">{% trans self.data.correct_feedback|default:self.data.explanation %}</textarea>
+                        <textarea class="correct-feedback"
+                                  aria-describedby="correct-feedback-description-{{id_suffix}}">{{ correct_feedback }}</textarea>
                     </label>
+                    <div id="correct-feedback-description-{{id_suffix}}" class="assessment-setting form-help">
+                      {% trans "Shown after a correct submission, whatever the Show Answer setting." %}
+                    </div>
 
-                    <label class="h4">
+                    <label class="h4 assessment-setting">
                         <span>{% trans "Incorrect answer feedback" %}</span>
-                        <textarea class="incorrect-feedback">{% trans self.data.incorrect_feedback|default:self.data.explanation %}</textarea>
+                        <textarea class="incorrect-feedback"
+                                  aria-describedby="incorrect-feedback-description-{{id_suffix}}">{{ incorrect_feedback }}</textarea>
                     </label>
+                    <div id="incorrect-feedback-description-{{id_suffix}}" class="assessment-setting form-help">
+                      {% trans "Shown after an incorrect submission, whatever the Show Answer setting. Avoid giving the answer away." %}
+                    </div>
                 </form>
             </div>
         </section>

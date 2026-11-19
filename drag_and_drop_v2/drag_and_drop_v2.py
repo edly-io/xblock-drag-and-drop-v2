@@ -214,7 +214,7 @@ class DragAndDropBlock(
     data = Dict(
         display_name=_("Problem data"),
         help=_(
-            "Information about zones, items, feedback, explanation and background image for this problem. "
+            "Information about zones, items, feedback and background image for this problem. "
             "This information is derived from the input that a course author provides via the interactive editor "
             "when configuring the problem."
         ),
@@ -468,6 +468,9 @@ class DragAndDropBlock(
             'fields': self.fields,
             'showanswer_set': self._field_data.has(self, 'showanswer'),  # If false, we're using an inherited value.
             'self': self,
+            # The legacy `explanation` gives the answer away, so it only pre-fills the correct answer feedback.
+            'correct_feedback': self.data.get('correct_feedback') or self.data.get('explanation') or '',
+            'incorrect_feedback': self.data.get('incorrect_feedback') or '',
         }
 
         fragment = Fragment()

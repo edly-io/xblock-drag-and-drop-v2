@@ -107,8 +107,10 @@ There are two problem modes available:
 * **Assessment**: In this mode, the learner places all items on the board and
   then clicks a "Submit" button to get feedback.
   * The number of attempts can be limited.
-  * The "Show Answer" setting controls when the explanation appears in the result card shown after
-    a submission. There is no "Show Answer" button. You can select one of the pre-defined conditions; they work
+  * The result card shown after a submission includes the "Correct answer feedback" or "Incorrect answer
+    feedback" set in the editor, right away. The "Show Answer" setting only controls when the older single
+    "Explanation Text" of problems not re-saved since then appears there. There is no "Show Answer" button.
+    You can select one of the pre-defined conditions; they work
     in the same way as in the Problem XBlock, so you can read about each them in the
     [Problem Component documentation][capa-show-answer].
     By default, the value from the course "Advanced Settings" configuration is used. If you have modified this for
