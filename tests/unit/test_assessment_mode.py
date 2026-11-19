@@ -678,6 +678,51 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
 
         self._assert_item_and_overall_feedback(res, expected_item_feedback, expected_overall_feedback)
 
+    def test_do_attempt_correct_and_incorrect_answer_feedback(self):
+        self.block.showanswer = SA.AFTER_ALL_ATTEMPTS
+        self.block.max_attempts = 5
+        self.block.data['explanation'] = 'Legacy'  # only a fallback once the answer is available
+
+        self._submit_incorrect_solution()
+        self.assertEqual(self._do_attempt()['attempt_result'], {'correct': False, 'feedback': None})
+
+        self.block.data['correct_feedback'] = 'Well done'
+        self.block.data['incorrect_feedback'] = 'Not yet'
+        self.assertEqual(self.block._get_attempt_result(), {'correct': False, 'feedback': 'Not yet'})
+
+        self.call_handler('clear_attempt_result', data={})
+        self._submit_complete_solution()
+        self.assertEqual(self._do_attempt()['attempt_result'], {'correct': True, 'feedback': 'Well done'})
+
+    def test_legacy_explanation_shown_once_answer_available(self):
+        self.block.showanswer = SA.ALWAYS
+        self.block.data['explanation'] = 'Legacy'
+
+        self._submit_incorrect_solution()
+        self.assertEqual(self._do_attempt()['attempt_result'], {'correct': False, 'feedback': 'Legacy'})
+        self.assertNotIn('explanation', self.call_handler(self.SHOW_ANSWER_HANDLER, data={}))
+
+    def test_studio_view_feedback_prefill(self):
+        """ The legacy `explanation` only pre-fills the correct answer feedback, and the editor opens without it """
+        original = dict(self.block.data)
+        for data, expected_correct, expected_incorrect in [
+            ({}, '', ''),
+            ({'explanation': 'Legacy'}, 'Legacy', ''),
+            ({'correct_feedback': 'Yes', 'incorrect_feedback': 'No', 'explanation': 'Legacy'}, 'Yes', 'No'),
+            ({'correct_feedback': '', 'explanation': 'Legacy'}, '', ''),  # the author cleared it
+        ]:
+            with self.subTest(data=data):
+                self.block.data = dict(original, **data)
+                html = self.block.studio_view(None).content
+                self.assertEqual(self._textarea_content(html, 'correct-feedback'), expected_correct)
+                self.assertEqual(self._textarea_content(html, 'incorrect-feedback'), expected_incorrect)
+
+    @staticmethod
+    def _textarea_content(html, css_class):
+        """ Returns the text inside the one <textarea> with this class """
+        after_class = html.split('class="{}"'.format(css_class), 1)[1]
+        return after_class.split('>', 1)[1].split('</textarea>', 1)[0]
+
     def test_do_attempt_feedback_correct(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 2: self.ZONE_2})  # correct solution
         res = self._do_attempt()

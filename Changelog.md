@@ -4,6 +4,12 @@ Drag and Drop XBlock changelog
 Unreleased
 ---------------------------
 
+* Replace the "Explanation Text" field with "Correct answer feedback" and "Incorrect answer feedback", shown in
+  the result card after a submission in Assessment mode. The legacy `explanation` pre-fills the correct answer
+  feedback, and is still shown (gated by "Show Answer") for problems not re-saved since.
+* The `show_answer` handler no longer returns `explanation`, and the user state's `attempt_result` returns
+  `feedback` instead of `explanation`.
+
 Version 5.0.6 (2026-04-29)
 --------------------------
 

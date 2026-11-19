@@ -670,7 +670,9 @@ function DragAndDropEditBlock(runtime, element, params) {
                             start: $form.find('.intro-feedback').val(),
                             finish: $form.find('.final-feedback').val()
                         };
-                        _fn.data.explanation = $form.find('.explanation').val();
+                        _fn.data.correct_feedback = $form.find('.correct-feedback').val();
+                        _fn.data.incorrect_feedback = $form.find('.incorrect-feedback').val();
+                        delete _fn.data.explanation; // replaced by the two fields above; it pre-fills the correct one
                     },
                     item: {
                         count: 0,
