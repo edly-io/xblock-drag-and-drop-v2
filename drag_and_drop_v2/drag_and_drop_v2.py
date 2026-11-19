@@ -680,36 +680,36 @@ class DragAndDropBlock(
                 self.i18n_service.gettext("The answer is unavailable")
             )
 
-        answer = self._get_correct_state()
+        return self._get_correct_state()
 
-        if explanation := self._get_explanation():
-            answer['explanation'] = explanation
-        return answer
-
-    def _get_explanation(self):
+    def _get_answer_feedback(self, correct):
         """
-        Returns the author's explanation as sanitized HTML, or None if there is none.
-        It gives the answer away, so callers must check `is_answer_available` first.
+        Returns the author's correct or incorrect answer feedback as sanitized HTML, or None if there is none.
+        Problems saved before the split only have the legacy `explanation`, which gives the answer away, so it
+        is only used once the Show Answer setting allows it.
         """
-        explanation = (self.data.get('explanation') or '').strip()
-        if not explanation:
+        feedback = (self.data.get('correct_feedback' if correct else 'incorrect_feedback') or '').strip()
+        if not feedback and self.is_answer_available:
+            feedback = (self.data.get('explanation') or '').strip()
+        if not feedback:
             return None
         if replace_urls_service := self.runtime.service(self, 'replace_urls'):
-            explanation = replace_urls_service.replace_urls(explanation)
+            feedback = replace_urls_service.replace_urls(feedback)
         else:
-            logger.debug('Unable to perform URL substitution on the explanation: %s', explanation)
-        return sanitize_html(explanation)
+            logger.debug('Unable to perform URL substitution on the feedback: %s', feedback)
+        return sanitize_html(feedback)
 
     def _get_attempt_result(self):
         """
         Returns the result of the last assessment attempt for the "Correct" / "Not quite" card, or None if the
-        items have changed since it. The explanation is only included once the Show Answer setting allows it.
+        items have changed since it.
         """
         if self.mode != Constants.ASSESSMENT_MODE or not self.last_attempt_result:
             return None
+        correct = self.last_attempt_result == 'correct'
         return {
-            'correct': self.last_attempt_result == 'correct',
-            'explanation': self._get_explanation() if self.is_answer_available else None,
+            'correct': correct,
+            'feedback': self._get_answer_feedback(correct),
         }
 
     @XBlock.json_handler

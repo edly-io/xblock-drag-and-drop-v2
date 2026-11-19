@@ -405,16 +405,16 @@ function DragAndDropTemplates(configuration, virtualDomLib) {
         return h('div.placed-count', text);
     };
 
-    // The "Correct" / "Not quite" card after an assessment attempt. Its body is the author's explanation once
-    // the Show Answer setting allows it (the server leaves it out until then), otherwise a short line.
+    // The "Correct" / "Not quite" card after an assessment attempt. Its body is the author's correct or
+    // incorrect answer feedback, otherwise a short line.
     var attemptResultTemplate = function(ctx) {
         var result = ctx.attempt_result;
         if (!result) {
             return null;
         }
         var body = null;
-        if (result.explanation) {
-            body = h('div.attempt-result-body', {innerHTML: result.explanation});
+        if (result.feedback) {
+            body = h('div.attempt-result-body', {innerHTML: result.feedback});
         } else if (!result.correct && ctx.attempts_remain) {
             body = h('div.attempt-result-body', gettext("Some cards aren't in the right zone yet. Try again."));
         }

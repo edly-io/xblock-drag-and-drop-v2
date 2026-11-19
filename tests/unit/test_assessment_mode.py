@@ -678,6 +678,22 @@ class TestDragAndDropAssessmentData(AssessmentModeFixture, unittest.TestCase):
 
         self._assert_item_and_overall_feedback(res, expected_item_feedback, expected_overall_feedback)
 
+    def test_do_attempt_correct_and_incorrect_answer_feedback(self):
+        self.block.showanswer = SA.AFTER_ALL_ATTEMPTS
+        self.block.max_attempts = 5
+        self.block.data['explanation'] = 'Legacy'  # only a fallback once the answer is available
+
+        self._submit_incorrect_solution()
+        self.assertEqual(self._do_attempt()['attempt_result'], {'correct': False, 'feedback': None})
+
+        self.block.data['correct_feedback'] = 'Well done'
+        self.block.data['incorrect_feedback'] = 'Not yet'
+        self.assertEqual(self.block._get_attempt_result(), {'correct': False, 'feedback': 'Not yet'})
+
+        self.call_handler('clear_attempt_result', data={})
+        self._submit_complete_solution()
+        self.assertEqual(self._do_attempt()['attempt_result'], {'correct': True, 'feedback': 'Well done'})
+
     def test_do_attempt_feedback_correct(self):
         self._submit_solution({0: self.ZONE_1, 1: self.ZONE_2, 2: self.ZONE_2})  # correct solution
         res = self._do_attempt()

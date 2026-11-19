@@ -115,8 +115,13 @@
                     </div>
 
                     <label class="h4">
-                        <span>{% trans "Explanation Text" %}</span>
-                        <textarea class="explanation">{% trans self.data.explanation %}</textarea>
+                        <span>{% trans "Correct answer feedback" %}</span>
+                        <textarea class="correct-feedback">{% trans self.data.correct_feedback|default:self.data.explanation %}</textarea>
+                    </label>
+
+                    <label class="h4">
+                        <span>{% trans "Incorrect answer feedback" %}</span>
+                        <textarea class="incorrect-feedback">{% trans self.data.incorrect_feedback|default:self.data.explanation %}</textarea>
                     </label>
                 </form>
             </div>
