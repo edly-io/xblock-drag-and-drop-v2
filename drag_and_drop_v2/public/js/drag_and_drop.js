@@ -1856,6 +1856,10 @@ function DragAndDropBlock(runtime, element, configuration) {
         // Mousedown events should start the drag immediately.
         $container.on('mousedown', '.option[draggable=true]', function(evt) {
             if (!handled_by_touch) {
+                // Result icons are visual-only indicators; a click on them must not start a drag.
+                if ($(evt.target).closest('.option-result-icon, .option-result-none').length) {
+                    return;
+                }
                 evt.preventDefault();
                 var $item = $(this);
                 var drag_origin = {x: pageX(evt), y: pageY(evt)};
@@ -1868,6 +1872,10 @@ function DragAndDropBlock(runtime, element, configuration) {
         // This allows users to scroll the item bank with their finger without accidentally starting
         // to drag items.
         $container.on('touchstart', '.option[draggable=true]', function(evt) {
+            // Result icons are visual-only indicators; a tap on them must not start a drag.
+            if ($(evt.target).closest('.option-result-icon, .option-result-none').length) {
+                return;
+            }
             handled_by_touch = true;
             var $item = $(this);
             var drag_origin = {x: pageX(evt), y: pageY(evt)};
