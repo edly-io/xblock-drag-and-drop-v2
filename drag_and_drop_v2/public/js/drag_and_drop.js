@@ -1867,10 +1867,9 @@ function DragAndDropBlock(runtime, element, configuration) {
             }
         });
 
-        // Touchstart events should start the event after a timeout.
-        // If the user starts moving the finger during the timeout, the drag should be cancelled.
-        // This allows users to scroll the item bank with their finger without accidentally starting
-        // to drag items.
+        // Touchstart events should start the drag either immediately on movement or after a short
+        // timeout, whichever comes first. If the user lifts their finger (touchend/touchcancel)
+        // before moving, it was just a tap — do not start a drag.
         $container.on('touchstart', '.option[draggable=true]', function(evt) {
             // Result icons are visual-only indicators; a tap on them must not start a drag.
             if ($(evt.target).closest('.option-result-icon, .option-result-none').length) {
@@ -1880,20 +1879,36 @@ function DragAndDropBlock(runtime, element, configuration) {
             var $item = $(this);
             var drag_origin = {x: pageX(evt), y: pageY(evt)};
             var timeout_id = null;
-            var cancelDrag = function() {
+
+            var cleanUp = function() {
                 clearTimeout(timeout_id);
-                // We need to reset the handled_by_touch in a timeout,
-                // so that it happens after the potentially emulated mousedown event.
+                $item.off('touchmove', onMoveBeforeDelay);
+                $item.off('touchend touchcancel', onEndBeforeDelay);
+            };
+
+            // User moved finger before the timeout — start drag immediately for a smooth feel.
+            var onMoveBeforeDelay = function() {
+                cleanUp();
+                handled_by_touch = false;
+                onDragStart('touch', $item, drag_origin);
+            };
+
+            // User lifted finger before moving — it was a tap, not a drag.
+            var onEndBeforeDelay = function() {
+                cleanUp();
+                // Reset handled_by_touch after the potentially emulated mousedown event.
                 setTimeout(function() {
                     handled_by_touch = false;
                 }, 0);
             };
 
-            $item.one('touchmove touchend touchcancel', cancelDrag);
+            $item.one('touchmove', onMoveBeforeDelay);
+            $item.one('touchend touchcancel', onEndBeforeDelay);
 
+            // Fallback: if no movement or end fires within the delay, start drag anyway.
             timeout_id = setTimeout(function() {
+                cleanUp();
                 handled_by_touch = false;
-                $item.off('touchmove touchend touchcancel', cancelDrag);
                 onDragStart('touch', $item, drag_origin);
             }, TOUCH_DRAG_DELAY);
         });
