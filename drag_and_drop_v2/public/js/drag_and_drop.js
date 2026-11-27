@@ -1919,7 +1919,7 @@ function DragAndDropBlock(runtime, element, configuration) {
         });
 
         // Prevent touchmove events fired on the dragged item causing scroll.
-        $container.on('touchmove', '.dragged-items .options[draggable=true]', function(evt) {
+        $container.on('touchmove', '.dragged-items .option[draggable=true]', function(evt) {
             evt.preventDefault();
         });
     };
