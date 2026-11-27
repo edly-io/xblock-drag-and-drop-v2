@@ -880,6 +880,10 @@ function DragAndDropBlock(runtime, element, configuration) {
     // without moving for drag to begin.
     // This allows user to scroll the container without accidentally dragging the items.
     var TOUCH_DRAG_DELAY = 250;
+    // Minimum distance (px) between the press point and the release point for the drop to register.
+    // Gestures shorter than this are treated as clicks/taps and revert — prevents an item that
+    // is already placed in a zone from shuffling to a different zone when the user clicks it.
+    var DROP_MIN_DISTANCE = 20;
 
     // Keyboard accessibility
     var ESC = 27;
@@ -1814,6 +1818,16 @@ function DragAndDropBlock(runtime, element, configuration) {
                     revertDrag();
                     return;
                 }
+                // A gesture shorter than DROP_MIN_DISTANCE is a click/tap — revert instead of
+                // placing, so a user clicking a zone-placed item cannot accidentally move it.
+                var end_x = (evt.type === 'touchend') ? evt.originalEvent.changedTouches[0].pageX : evt.pageX;
+                var end_y = (evt.type === 'touchend') ? evt.originalEvent.changedTouches[0].pageY : evt.pageY;
+                var ddx = end_x - drag_origin.x;
+                var ddy = end_y - drag_origin.y;
+                if (Math.sqrt(ddx * ddx + ddy * ddy) < DROP_MIN_DISTANCE) {
+                    revertDrag();
+                    return;
+                }
                 // Dropped outside every zone, the card animates back to where it was: its zone or the bank.
                 var $zone = getTargetZone(evt);
                 if ($zone) {
@@ -1856,6 +1870,13 @@ function DragAndDropBlock(runtime, element, configuration) {
         // Mousedown events should start the drag immediately.
         $container.on('mousedown', '.option[draggable=true]', function(evt) {
             if (!handled_by_touch) {
+                // Result icons are visual-only indicators; a click on them must not start a drag.
+                // Still prevent the default, or the browser starts a native HTML5 drag of the
+                // draggable=true card (ghost image, no drop) when the mouse moves.
+                if ($(evt.target).closest('.option-result-icon, .option-result-none').length) {
+                    evt.preventDefault();
+                    return;
+                }
                 evt.preventDefault();
                 var $item = $(this);
                 var drag_origin = {x: pageX(evt), y: pageY(evt)};
@@ -1863,19 +1884,21 @@ function DragAndDropBlock(runtime, element, configuration) {
             }
         });
 
-        // Touchstart events should start the event after a timeout.
-        // If the user starts moving the finger during the timeout, the drag should be cancelled.
-        // This allows users to scroll the item bank with their finger without accidentally starting
-        // to drag items.
+        // Touchstart events should start the drag after a hold timeout.
+        // Any finger movement before the timeout fires cancels the drag, so the user can still
+        // scroll the item bank vertically without accidentally picking up a card.
         $container.on('touchstart', '.option[draggable=true]', function(evt) {
+            // Result icons are visual-only indicators; a tap on them must not start a drag.
+            if ($(evt.target).closest('.option-result-icon, .option-result-none').length) {
+                return;
+            }
             handled_by_touch = true;
             var $item = $(this);
             var drag_origin = {x: pageX(evt), y: pageY(evt)};
             var timeout_id = null;
             var cancelDrag = function() {
                 clearTimeout(timeout_id);
-                // We need to reset the handled_by_touch in a timeout,
-                // so that it happens after the potentially emulated mousedown event.
+                // Reset handled_by_touch after the potentially emulated mousedown event.
                 setTimeout(function() {
                     handled_by_touch = false;
                 }, 0);
@@ -1896,7 +1919,7 @@ function DragAndDropBlock(runtime, element, configuration) {
         });
 
         // Prevent touchmove events fired on the dragged item causing scroll.
-        $container.on('touchmove', '.dragged-items .options[draggable=true]', function(evt) {
+        $container.on('touchmove', '.dragged-items .option[draggable=true]', function(evt) {
             evt.preventDefault();
         });
     };
