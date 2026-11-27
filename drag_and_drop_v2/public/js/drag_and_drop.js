@@ -882,7 +882,7 @@ function DragAndDropBlock(runtime, element, configuration) {
     var TOUCH_DRAG_DELAY = 250;
     // Minimum finger movement (px) required to distinguish an intentional drag from a tap jitter.
     var TOUCH_DRAG_THRESHOLD = 10;
-    // Minimum total gesture distance (px) from dragstart to dragend for the drop to register.
+    // Minimum distance (px) between the press point and the release point for the drop to register.
     // Gestures shorter than this are treated as clicks/taps and revert — prevents an item that
     // is already placed in a zone from shuffling to a different zone when the user clicks it.
     var DROP_MIN_DISTANCE = 20;
@@ -1873,7 +1873,10 @@ function DragAndDropBlock(runtime, element, configuration) {
         $container.on('mousedown', '.option[draggable=true]', function(evt) {
             if (!handled_by_touch) {
                 // Result icons are visual-only indicators; a click on them must not start a drag.
+                // Still prevent the default, or the browser starts a native HTML5 drag of the
+                // draggable=true card (ghost image, no drop) when the mouse moves.
                 if ($(evt.target).closest('.option-result-icon, .option-result-none').length) {
+                    evt.preventDefault();
                     return;
                 }
                 evt.preventDefault();
