@@ -880,8 +880,6 @@ function DragAndDropBlock(runtime, element, configuration) {
     // without moving for drag to begin.
     // This allows user to scroll the container without accidentally dragging the items.
     var TOUCH_DRAG_DELAY = 250;
-    // Minimum finger movement (px) required to distinguish an intentional drag from a tap jitter.
-    var TOUCH_DRAG_THRESHOLD = 10;
     // Minimum distance (px) between the press point and the release point for the drop to register.
     // Gestures shorter than this are treated as clicks/taps and revert — prevents an item that
     // is already placed in a zone from shuffling to a different zone when the user clicks it.
@@ -1886,9 +1884,9 @@ function DragAndDropBlock(runtime, element, configuration) {
             }
         });
 
-        // Touchstart events should start the drag either immediately on movement or after a short
-        // timeout, whichever comes first. If the user lifts their finger (touchend/touchcancel)
-        // before moving, it was just a tap — do not start a drag.
+        // Touchstart events should start the drag after a hold timeout.
+        // Any finger movement before the timeout fires cancels the drag, so the user can still
+        // scroll the item bank vertically without accidentally picking up a card.
         $container.on('touchstart', '.option[draggable=true]', function(evt) {
             // Result icons are visual-only indicators; a tap on them must not start a drag.
             if ($(evt.target).closest('.option-result-icon, .option-result-none').length) {
@@ -1898,42 +1896,19 @@ function DragAndDropBlock(runtime, element, configuration) {
             var $item = $(this);
             var drag_origin = {x: pageX(evt), y: pageY(evt)};
             var timeout_id = null;
-
-            var cleanUp = function() {
+            var cancelDrag = function() {
                 clearTimeout(timeout_id);
-                $item.off('touchmove', onMoveBeforeDelay);
-                $item.off('touchend touchcancel', onEndBeforeDelay);
-            };
-
-            // User moved finger before the timeout — start drag immediately once movement is
-            // intentional (exceeds TOUCH_DRAG_THRESHOLD) to avoid treating tap jitter as a drag.
-            var onMoveBeforeDelay = function(evt) {
-                var dx = pageX(evt) - drag_origin.x;
-                var dy = pageY(evt) - drag_origin.y;
-                if (Math.sqrt(dx * dx + dy * dy) < TOUCH_DRAG_THRESHOLD) {
-                    return; // Sub-threshold jitter — keep waiting
-                }
-                cleanUp();
-                handled_by_touch = false;
-                onDragStart('touch', $item, drag_origin);
-            };
-
-            // User lifted finger before intentional movement — it was a tap, not a drag.
-            var onEndBeforeDelay = function() {
-                cleanUp();
                 // Reset handled_by_touch after the potentially emulated mousedown event.
                 setTimeout(function() {
                     handled_by_touch = false;
                 }, 0);
             };
 
-            $item.on('touchmove', onMoveBeforeDelay);    // .on() so threshold can fire on each move
-            $item.one('touchend touchcancel', onEndBeforeDelay);
+            $item.one('touchmove touchend touchcancel', cancelDrag);
 
-            // Fallback: if no movement or end fires within the delay, start drag anyway.
             timeout_id = setTimeout(function() {
-                cleanUp();
                 handled_by_touch = false;
+                $item.off('touchmove touchend touchcancel', cancelDrag);
                 onDragStart('touch', $item, drag_origin);
             }, TOUCH_DRAG_DELAY);
         });
