@@ -880,6 +880,8 @@ function DragAndDropBlock(runtime, element, configuration) {
     // without moving for drag to begin.
     // This allows user to scroll the container without accidentally dragging the items.
     var TOUCH_DRAG_DELAY = 250;
+    // Minimum finger movement (px) required to distinguish an intentional drag from a tap jitter.
+    var TOUCH_DRAG_THRESHOLD = 10;
 
     // Keyboard accessibility
     var ESC = 27;
@@ -1886,14 +1888,20 @@ function DragAndDropBlock(runtime, element, configuration) {
                 $item.off('touchend touchcancel', onEndBeforeDelay);
             };
 
-            // User moved finger before the timeout — start drag immediately for a smooth feel.
-            var onMoveBeforeDelay = function() {
+            // User moved finger before the timeout — start drag immediately once movement is
+            // intentional (exceeds TOUCH_DRAG_THRESHOLD) to avoid treating tap jitter as a drag.
+            var onMoveBeforeDelay = function(evt) {
+                var dx = pageX(evt) - drag_origin.x;
+                var dy = pageY(evt) - drag_origin.y;
+                if (Math.sqrt(dx * dx + dy * dy) < TOUCH_DRAG_THRESHOLD) {
+                    return; // Sub-threshold jitter — keep waiting
+                }
                 cleanUp();
                 handled_by_touch = false;
                 onDragStart('touch', $item, drag_origin);
             };
 
-            // User lifted finger before moving — it was a tap, not a drag.
+            // User lifted finger before intentional movement — it was a tap, not a drag.
             var onEndBeforeDelay = function() {
                 cleanUp();
                 // Reset handled_by_touch after the potentially emulated mousedown event.
@@ -1902,7 +1910,7 @@ function DragAndDropBlock(runtime, element, configuration) {
                 }, 0);
             };
 
-            $item.one('touchmove', onMoveBeforeDelay);
+            $item.on('touchmove', onMoveBeforeDelay);    // .on() so threshold can fire on each move
             $item.one('touchend touchcancel', onEndBeforeDelay);
 
             // Fallback: if no movement or end fires within the delay, start drag anyway.
