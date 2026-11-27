@@ -882,6 +882,10 @@ function DragAndDropBlock(runtime, element, configuration) {
     var TOUCH_DRAG_DELAY = 250;
     // Minimum finger movement (px) required to distinguish an intentional drag from a tap jitter.
     var TOUCH_DRAG_THRESHOLD = 10;
+    // Minimum total gesture distance (px) from dragstart to dragend for the drop to register.
+    // Gestures shorter than this are treated as clicks/taps and revert — prevents an item that
+    // is already placed in a zone from shuffling to a different zone when the user clicks it.
+    var DROP_MIN_DISTANCE = 20;
 
     // Keyboard accessibility
     var ESC = 27;
@@ -1813,6 +1817,16 @@ function DragAndDropBlock(runtime, element, configuration) {
                     $item.off('touchend touchcancel', onDragEnd);
                 }
                 if (evt.type === 'touchcancel') {
+                    revertDrag();
+                    return;
+                }
+                // A gesture shorter than DROP_MIN_DISTANCE is a click/tap — revert instead of
+                // placing, so a user clicking a zone-placed item cannot accidentally move it.
+                var end_x = (evt.type === 'touchend') ? evt.originalEvent.changedTouches[0].pageX : evt.pageX;
+                var end_y = (evt.type === 'touchend') ? evt.originalEvent.changedTouches[0].pageY : evt.pageY;
+                var ddx = end_x - drag_origin.x;
+                var ddy = end_y - drag_origin.y;
+                if (Math.sqrt(ddx * ddx + ddy * ddy) < DROP_MIN_DISTANCE) {
                     revertDrag();
                     return;
                 }
